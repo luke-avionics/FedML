@@ -25,7 +25,7 @@ from fedml_api.data_preprocessing.cifar10.data_loader import load_partition_data
 from fedml_api.data_preprocessing.cifar100.data_loader import load_partition_data_cifar100
 from fedml_api.data_preprocessing.cinic10.data_loader import load_partition_data_cinic10
 from fedml_api.model.deep_neural_networks.mobilenet import mobilenet
-from fedml_api.model.deep_neural_networks.resnet import resnet56
+from fedml_api.model.deep_neural_networks.resnet import resnet38
 
 
 def add_args(parser):
@@ -133,8 +133,8 @@ def create_model(args, model_name, output_dim):
     elif model_name == "rnn" and args.dataset == "shakespeare":
         model = RNN_OriginalFedAvg(28 * 28, output_dim)
         args.client_optimizer = "sgd"
-    elif model_name == "resnet56":
-        model = resnet56(class_num=output_dim)
+    elif model_name == "resnet38":
+        model = resnet38(class_num=output_dim)
     elif model_name == "mobilenet":
         model = mobilenet(class_num=output_dim)
     return model
