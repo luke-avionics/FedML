@@ -91,7 +91,7 @@ class FedAVGAggregator(object):
         logging.info("client_indexes = %s" % str(client_indexes))
         return client_indexes
 
-    def test_on_all_clients(self, round_idx):
+    def test_on_all_clients(self, round_idx,traffic_count):
         if round_idx % self.args.frequency_of_the_test == 0 or round_idx == self.args.comm_round - 1:
             logging.info("################local_test_on_all_clients : {}".format(round_idx))
             train_num_samples = []
@@ -127,6 +127,7 @@ class FedAVGAggregator(object):
             test_loss = sum(test_losses) / sum(test_num_samples)
             wandb.log({"Test/Acc": test_acc, "round": round_idx})
             wandb.log({"Test/Loss": test_loss, "round": round_idx})
+            wandb.log({"Test/Acc": test_acc, "traffic_volume": traffic_count})
             stats = {'test_acc': test_acc, 'test_loss': test_loss}
             logging.info(stats)
 

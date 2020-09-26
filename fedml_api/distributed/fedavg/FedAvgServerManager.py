@@ -13,7 +13,7 @@ class FedAVGServerManager(ServerManager):
         self.aggregator = aggregator
         self.round_num = args.comm_round
         self.round_idx = 0
-
+        self.traffic_count=0
     def run(self):
         super().run()
 
@@ -33,14 +33,24 @@ class FedAVGServerManager(ServerManager):
         sender_id = msg_params.get(MyMessage.MSG_ARG_KEY_SENDER)
         model_params = msg_params.get(MyMessage.MSG_ARG_KEY_MODEL_PARAMS)
         local_sample_number = msg_params.get(MyMessage.MSG_ARG_KEY_NUM_SAMPLES)
-
+        try:
+            for received_pack in model_params.keys():
+                tmp_traffic=1
+                for tmp_dim in model_params[received_pack].shape:
+                    tmp_traffic*=tmp_dim
+                self.traffic_count+=tmp_traffic
+            logging.info("Traffic consummed: "+str(self.traffic_count))
+        except Exception as e:
+            logging.info(str(e))
         self.aggregator.add_local_trained_result(sender_id - 1, model_params, local_sample_number)
         b_all_received = self.aggregator.check_whether_all_receive()
         logging.info("b_all_received = " + str(b_all_received))
         if b_all_received:
             global_model_params = self.aggregator.aggregate()
-            self.aggregator.test_on_all_clients(self.round_idx)
-
+            try:
+                self.aggregator.test_on_all_clients(self.round_idx,self.traffic_count)
+            except Exception as e:
+                raise Exception(str(e))
             # start the next round
             self.round_idx += 1
             if self.round_idx == self.round_num:
