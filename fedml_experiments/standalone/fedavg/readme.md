@@ -1,55 +1,41 @@
-## Experimental Tracking Platform (report real-time result to wandb.com)
+## Experimental Tracking Platform (report real-time result to wandb.com, please change ID to your own)
 wandb login ee0b5f53d949c84cee7decbe7a629e63fb2f8408
 
+
 ## Experiment Scripts
-1. Homogeneous distribution (IID) experiment:
+Heterogeneous distribution (Non-IID) experiment:
+
+Frond-end debugging:
 ``` 
-# CIFAR10, ResNet56
-nohup sh run_fedavg_standalone_pytorch.sh 2 10 64 cifar10 ./../../../data/cifar10 resnet56 homo 200 20 0.001 > ./fedavg_standalone.txt 2>&1 &
+## MNIST
+sh run_fedavg_standalone_pytorch.sh 0 10 10 mnist ./../../../data/mnist lr hetero 200 20 0.03 sgd 0
 
-# CIFAR10, MobileNet
-nohup sh run_fedavg_standalone_pytorch.sh 3 10 64 cifar10 ./../../../data/cifar10 mobilenet homo 200 20 0.001 > ./fedavg_standalone.txt 2>&1 &
+## shakespeare (LEAF)
+sh run_fedavg_standalone_pytorch.sh 0 10 10 shakespeare ./../../../data/shakespeare rnn hetero 100 1 0.8 sgd 0
 
-# CIFAR100, ResNet56
-nohup sh run_fedavg_standalone_pytorch.sh 4 10 64 cifar100 ./../../../data/cifar100 resnet56 homo 200 20 0.001 > ./fedavg_standalone.txt 2>&1 &
+# fed_shakespeare (Google)
+sh run_fedavg_standalone_pytorch.sh 0 10 10 fed_shakespeare ./../../../data/fed_shakespeare rnn hetero 100 1 0.8 sgd 0
 
-# CIFAR100, MobileNet
-nohup sh run_fedavg_standalone_pytorch.sh 5 10 64 cifar100 ./../../../data/cifar100 mobilenet homo 200 20 0.001 > ./fedavg_standalone.txt 2>&1 &
+## Federated EMNIST
+sh run_fedavg_standalone_pytorch.sh 0 10 10 femnist ./../../../data/FederatedEMNIST cnn hetero 200 1 0.03 sgd 0
 
-# CINIC10, ResNet56
-nohup sh run_fedavg_standalone_pytorch.sh 6 10 64 cinic10 ./../../../data/cinic10 resnet56 homo 200 20 0.001 > ./fedavg_standalone.txt 2>&1 &
+## Fed_CIFAR100
+sh run_fedavg_standalone_pytorch.sh 0 10 10 fed_cifar100 ./../../../data/fed_cifar100 resnet18_gn hetero 200 1 0.03 adam 0
 
-# CINIC10, MobileNet
-nohup sh run_fedavg_standalone_pytorch.sh 7 10 64 cinic10 ./../../../data/cinic10 mobilenet homo 200 20 0.001 > ./fedavg_standalone.txt 2>&1 &
+# Stackoverflow_LR
+sh run_fedavg_standalone_pytorch.sh 0 10 10 stackoverflow_lr ./../../../data/stackoverflow lr hetero 200 1 0.03 sgd 0
+
+# Stackoverflow_NWP
+sh run_fedavg_standalone_pytorch.sh 0 10 10 stackoverflow_nwp ./../../../data/stackoverflow cnn hetero 200 1 0.03 sgd 0
 ```
 
-
-2. Heterogeneous distribution (Non-IID) experiment:
+Please make sure to run on the background when you start training after debugging. An example to run on the background:
 ``` 
 # MNIST
-nohup sh run_fedavg_standalone_pytorch.sh 2 10 10 mnist ./../../../data/mnist lr hetero 200 20 0.03 > ./fedavg_standalone.txt 2>&1 &
-
-# shakespeare
-nohup sh run_fedavg_standalone_pytorch.sh 2 10 10 shakespeare ./../../../data/shakespeare rnn hetero 100 10 0.8 > ./fedavg_standalone.txt 2>&1 &
-
-# CIFAR10, ResNet56
-nohup sh run_fedavg_standalone_pytorch.sh 2 10 64 cifar10 ./../../../data/cifar10 resnet56 hetero 200 20 0.001 > ./fedavg_standalone.txt 2>&1 &
-
-# CIFAR10, MobileNet
-nohup sh run_fedavg_standalone_pytorch.sh 3 10 64 cifar10 ./../../../data/cifar10 mobilenet hetero 200 20 0.001 > ./fedavg_standalone.txt 2>&1 &
-
-# CIFAR100, ResNet56
-nohup sh run_fedavg_standalone_pytorch.sh 4 10 64 cifar100 ./../../../data/cifar100 resnet56 hetero 200 20 0.001 > ./fedavg_standalone.txt 2>&1 &
-
-# CIFAR100, MobileNet
-nohup sh run_fedavg_standalone_pytorch.sh 5 10 64 cifar100 ./../../../data/cifar100 mobilenet hetero 200 20 0.001 > ./fedavg_standalone.txt 2>&1 &
-
-# CINIC10, ResNet56
-nohup sh run_fedavg_standalone_pytorch.sh 6 10 64 cinic10 ./../../../data/cinic10 resnet56 hetero 200 20 0.001 > ./fedavg_standalone.txt 2>&1 &
-
-# CINIC10, MobileNet
-nohup sh run_fedavg_standalone_pytorch.sh 7 10 64 cinic10 ./../../../data/cinic10 mobilenet hetero 200 20 0.001 > ./fedavg_standalone.txt 2>&1 &
+nohup sh run_fedavg_standalone_pytorch.sh 2 10 10 mnist ./../../../data/mnist lr hetero 200 20 0.03 sgd 0 > ./fedavg_standalone.txt 2>&1 &
 ```
+
+For large DNNs (ResNet, Transformer, etc), please use the distributed computing (fedml_api/distributed). 
 
 
 ### Benchmark Results

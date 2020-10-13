@@ -68,6 +68,7 @@ class FedAvgTrainer(object):
                 # self.logger.info("local weights = " + str(w))
                 w_locals.append((client.get_sample_number(), copy.deepcopy(w)))
                 loss_locals.append(copy.deepcopy(loss))
+                logging.info('Client {:3d}, loss {:.3f}'.format(client_idx, loss))
 
             # update global weights
             w_glob = self.aggregate(w_locals)
@@ -111,6 +112,12 @@ class FedAvgTrainer(object):
         test_losses = []
         client = self.client_list[0]
         for client_idx in range(self.args.client_num_in_total):
+            """
+            Note: for datasets like "fed_CIFAR100" and "fed_shakespheare",
+            the training client number is larger than the testing client number
+            """
+            if self.test_data_local_dict[client_idx] is None:
+                continue
             client.update_local_dataset(0, self.train_data_local_dict[client_idx],
                                         self.test_data_local_dict[client_idx],
                                         self.train_data_local_num_dict[client_idx])
@@ -125,6 +132,13 @@ class FedAvgTrainer(object):
             test_tot_corrects.append(copy.deepcopy(test_tot_correct))
             test_num_samples.append(copy.deepcopy(test_num_sample))
             test_losses.append(copy.deepcopy(test_loss))
+
+            """
+            Note: CI environment is CPU-based computing. 
+            The training speed for RNN training is to slow in this setting, so we only test a client to make sure there is no programming error.
+            """
+            if self.args.ci == 1:
+                break
 
         # test on training dataset
         train_acc = sum(train_tot_corrects) / sum(train_num_samples)

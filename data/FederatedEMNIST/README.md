@@ -1,39 +1,29 @@
-Download the dataset here:
-https://drive.google.com/file/d/1tCEcJgRJ8NdRo11UJZR6WSKMNdmox4GC/view?usp=sharing
-unzip it and put the json files into corresponding directory, train_file_name.json into "train" directory, and test_file_name.json into "test" directory
+# Introduction
 
-Distribution as follows:
-DATASET: nist
-200 users
-16421 samples (total)
-82.11 samples per user (mean)
-num_samples (std): 142.99
-num_samples (std/mean): 1.74
-num_samples (skewness): 9.56
+Federated EMNIST dataset extends MNIST dataset with upper and lower case English characters. It is suggested by "Adaptive Federated Optimization" (https://arxiv.org/abs/2003.00295, Google AI).
 
-num_sam num_users
-0        23
-20       54
-40       41
-60       29
-80       9
-100      6
-120      8
-140      8
-160      3
-180      2
-200      4
-220      2
-240      5
-260      0
-280      1
-300      0
-320      2
-340      2
-360      0
-380      0
-400      0
-420      0
-440      0
-460      0
-480      0
+In order to support more frameworks like PyTorch, we loaded data from TensorFlow Federated (TFF) [emnist load_data API](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/emnist/load_data) and saved it on [google drive]( https://drive.google.com/drive/folders/1S377qFHM_q_o1hE7-ODlmtRT6iV6N7AT?usp=sharing) in h5 format. 
+
+# Prepare FederatedEMNIST Dataset
+
+You can run the following script to download the dataset:
+
+```
+sh download_federatedEMNIST.sh
+```
+
+By default, it will download EMNIST dataset which includes digits and characters.  TFF also supports getting only the digits data from EMNIST dataset. So we generated another digits only dataset from it. To obtain the digits only dataset, use the following command to download it:
+
+```
+sh download_federatedEMNIST.sh digit
+```
+
+
+# Statistics of FederatedEMNIST Dataset
+
+Data partition is the same as [TFF](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/emnist), with the following statistics.  
+
+| DATASET   | TRAIN CLIENTS | TRAIN EXAMPLES | TEST CLIENTS | TEST EXAMPLES |
+| --------- | ------------- | -------------- | ------------ | ------------- |
+| EMNIST-62 | 3,400         | 671,585        | 3,400        | 77,483        |
+
