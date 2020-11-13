@@ -38,7 +38,7 @@ class FedAVGServerManager(ServerManager):
                 tmp_traffic=1
                 for tmp_dim in model_params[received_pack].shape:
                     tmp_traffic*=tmp_dim
-                if self.args.cyclic_num_bits_schedule is None:
+                if len(self.args.cyclic_num_bits_schedule)==0:
                     self.traffic_count+=tmp_traffic
                 else:
                     self.traffic_count+=int(tmp_traffic/(32/self.args.cyclic_num_bits_schedule[0]))

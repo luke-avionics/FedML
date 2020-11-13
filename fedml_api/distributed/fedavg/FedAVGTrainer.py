@@ -47,7 +47,7 @@ class FedAVGTrainer(object):
 
         epoch_loss = []
         for epoch in range(self.args.epochs):
-            if self.args.cyclic_num_bits_schedule is None:
+            if len(self.args.cyclic_num_bits_schedule)==0:
                 num_bits = 0
             else:
                 num_bits = self.cyclic_adjust_precision(epoch)
