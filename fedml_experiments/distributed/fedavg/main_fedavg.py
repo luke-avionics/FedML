@@ -90,7 +90,12 @@ def add_args(parser):
 
     parser.add_argument('--gpu_num_per_server', type=int, default=4,
                         help='gpu_num_per_server')
-
+    parser.add_argument('--inference_bits', default=0, type=int,  
+                        help='precision used for inference')                 
+    parser.add_argument('--cyclic_period', default=1, type=float, 
+                        help='cyclic schedule period for weight/act precision')
+    parser.add_argument('--cyclic_num_bits_schedule', default=None, type=int, nargs='*',
+                        help='cyclic schedule for weight/act precision')
     parser.add_argument('--ci', type=int, default=0,
                         help='CI')
     args = parser.parse_args()
@@ -244,7 +249,7 @@ if __name__ == "__main__":
         wandb.init(
             # project="federated_nas",
             project="fedml",
-            name="FedAVG(d)" + str(args.partition_method) + "r" + str(args.comm_round) + "-e" + str(
+            name="FedAVG(d)"+str(self.cyclic_num_bits_schedule)+ "-infer"+str(self.inference_bits)+"-"+str(args.partition_method) + "r" + str(args.comm_round) + "-e" + str(
                 args.epochs) + "-lr" + str(
                 args.lr),
             config=args

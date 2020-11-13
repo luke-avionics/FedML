@@ -38,8 +38,12 @@ class FedAVGServerManager(ServerManager):
                 tmp_traffic=1
                 for tmp_dim in model_params[received_pack].shape:
                     tmp_traffic*=tmp_dim
-                self.traffic_count+=tmp_traffic
+                if self.args.cyclic_num_bits_schedule is None:
+                    self.traffic_count+=tmp_traffic
+                else:
+                    self.traffic_count+=int(tmp_traffic/(32/self.args.cyclic_num_bits_schedule[0]))
             logging.info("Traffic consummed: "+str(self.traffic_count))
+            #wandb.log({"Traffic consummed": self.traffic_count, "mini_round": self.round_idx},commit=False)
         except Exception as e:
             logging.info(str(e))
         self.aggregator.add_local_trained_result(sender_id - 1, model_params, local_sample_number)
