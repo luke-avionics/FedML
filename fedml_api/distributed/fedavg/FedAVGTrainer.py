@@ -40,17 +40,16 @@ class FedAVGTrainer(object):
         self.local_sample_number = self.train_data_local_num_dict[client_index]
 
     def train(self):
-        if self.args.cyclic_num_bits_schedule is None:
-            num_bits = 0
-        else:
-            num_bits = self.cyclic_adjust_precision(epoch)
-
         self.model.to(self.device)
         # change to train mode
         self.model.train()
 
         epoch_loss = []
         for epoch in range(self.args.epochs):
+            if self.args.cyclic_num_bits_schedule is None:
+                num_bits = 0
+            else:
+                num_bits = self.cyclic_adjust_precision(epoch)
             batch_loss = []
             for batch_idx, (x, labels) in enumerate(self.train_local):
                 # logging.info(images.shape)

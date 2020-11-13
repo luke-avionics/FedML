@@ -29,7 +29,7 @@ from fedml_api.data_preprocessing.cinic10.data_loader import load_partition_data
 from fedml_api.model.cv.cnn import CNN_DropOut
 from fedml_api.model.cv.resnet_gn import resnet18
 from fedml_api.model.cv.mobilenet import mobilenet
-from fedml_api.model.cv.resnet import resnet38
+from fedml_api.model.cv.resnet import resnet20, resnet38, resnet74, resnet110, resnet110
 from fedml_api.model.nlp.rnn import RNN_OriginalFedAvg, RNN_StackOverFlow
 from fedml_api.model.linear.lr import LogisticRegression
 from fedml_api.distributed.fedavg.FedAvgAPI import FedML_init, FedML_FedAvg_distributed
@@ -197,8 +197,8 @@ def create_model(args, model_name, output_dim):
     elif model_name == "rnn" and args.dataset == "stackoverflow_nwp":
         logging.info("CNN + stackoverflow_nwp")
         model = RNN_StackOverFlow()
-    elif model_name == "resnet38":
-        model = resnet56(class_num=output_dim)
+    elif model_name == "resnet20":
+        model = resnet20(class_num=output_dim)
     elif model_name == "mobilenet":
         model = mobilenet(class_num=output_dim)
     return model
