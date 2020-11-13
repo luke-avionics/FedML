@@ -96,6 +96,8 @@ def add_args(parser):
                         help='cyclic schedule period for weight/act precision')
     parser.add_argument('--cyclic_num_bits_schedule', default=None, type=int, nargs='*',
                         help='cyclic schedule for weight/act precision')
+    parser.add_argument('--lr_decay_step_size', default=2000, type=int,  
+                        help='lr decay step size')   
     parser.add_argument('--ci', type=int, default=0,
                         help='CI')
     args = parser.parse_args()

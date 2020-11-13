@@ -29,7 +29,8 @@ class FedAVGTrainer(object):
             self.optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.model.parameters()),
                                               lr=self.args.lr,
                                               weight_decay=self.args.wd, amsgrad=True)
-
+        self.scheduler = torch.optim.StepLR(self.optimizer, step_size=self.args.lr_decay_step_size, gamma=0.1)
+        self.comm_round = 0 
     def update_model(self, weights):
         # logging.info("update_model. client_index = %d" % self.client_index)
         self.model.load_state_dict(weights)
@@ -67,6 +68,12 @@ class FedAVGTrainer(object):
                 epoch_loss.append(sum(batch_loss) / len(batch_loss))
                 logging.info('(client {}. Local Training Epoch: {} \tLoss: {:.6f}'.format(self.client_index,
                                                                 epoch, sum(epoch_loss) / len(epoch_loss)))
+        if self.comm_round < (self.args.lr_decay_step_size+1):
+            self.scheduler.step()
+        self.comm_round+=1
+        for g in self.optimizer.param_groups:
+            logging.info("===current learning rate===: "str(g['lr']))
+            break
         self.first_run=False
 
         weights = self.model.cpu().state_dict()
