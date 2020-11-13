@@ -94,7 +94,7 @@ def add_args(parser):
                         help='precision used for inference')                 
     parser.add_argument('--cyclic_period', default=1, type=float, 
                         help='cyclic schedule period for weight/act precision')
-    parser.add_argument('--cyclic_num_bits_schedule', default=None, type=int, nargs='*',
+    parser.add_argument('--cyclic_num_bits_schedule', default=[], type=int, nargs='*',
                         help='cyclic schedule for weight/act precision')
     parser.add_argument('--lr_decay_step_size', default=2000, type=int,  
                         help='lr decay step size')   
@@ -251,7 +251,7 @@ if __name__ == "__main__":
         wandb.init(
             # project="federated_nas",
             project="fedml",
-            name="FedAVG(d)"+str(args.cyclic_num_bits_schedule)+ "-infer"+str(args.inference_bits)+"-"+str(args.partition_method) + "r" + str(args.comm_round) + "-e" + str(
+            name="FedAVG(d)"+str(args.model)+str(args.dataset)+str(args.batch_size)+str(args.cyclic_num_bits_schedule)+ "-infer"+str(args.inference_bits)+"-"+str(args.partition_method) + "r" + str(args.comm_round) + "-e" + str(
                 args.epochs) + "-lr" + str(
                 args.lr),
             config=args

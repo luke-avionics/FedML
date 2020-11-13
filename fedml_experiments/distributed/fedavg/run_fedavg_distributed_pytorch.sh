@@ -14,7 +14,7 @@ INFERENCE_BITS=0
 schedule=()
 CYCLIC_NUM_BITS_SCHEDULE=${schedule[@]}
 LR_DECAY_STEP_SIZE=2000
-DATASET='cifar100'
+DATASET='cifar10'
 DATA_DIR="/home/yz87/FedML/fedml_experiments/distributed/fedavg"
 
 PROCESS_NUM=`expr $WORKER_NUM + 1`
