@@ -19,6 +19,7 @@ class FedAVGTrainer(object):
         self.device = device
         self.args = args
         self.model = model
+        self.first_run= True
         # logging.info(self.model)
         self.model.to(self.device)
         self.criterion = nn.CrossEntropyLoss().to(self.device)
@@ -55,7 +56,7 @@ class FedAVGTrainer(object):
                 # logging.info(images.shape)
                 x, labels = x.to(self.device), labels.to(self.device)
                 self.optimizer.zero_grad()
-                if epoch < 10 and  round_idx ==0:
+                if epoch < 10 and  self.first_run:
                     log_probs = self.model(x, num_bits=0)
                 else:
                     log_probs = self.model(x, num_bits=num_bits)
@@ -67,6 +68,7 @@ class FedAVGTrainer(object):
                 epoch_loss.append(sum(batch_loss) / len(batch_loss))
                 logging.info('(client {}. Local Training Epoch: {} \tLoss: {:.6f}'.format(self.client_index,
                                                                 epoch, sum(epoch_loss) / len(epoch_loss)))
+        self.first_run=False
 
         weights = self.model.cpu().state_dict()
 

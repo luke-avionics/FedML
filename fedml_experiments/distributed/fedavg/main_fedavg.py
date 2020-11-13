@@ -65,7 +65,7 @@ def add_args(parser):
     parser.add_argument('--batch_size', type=int, default=64, metavar='N',
                         help='input batch size for training (default: 64)')
 
-    parser.add_argument('--client_optimizer', type=str, default='adam',
+    parser.add_argument('--client_optimizer', type=str, default='sgd',
                         help='SGD with momentum; adam')
 
     parser.add_argument('--lr', type=float, default=0.001, metavar='LR',
@@ -249,7 +249,7 @@ if __name__ == "__main__":
         wandb.init(
             # project="federated_nas",
             project="fedml",
-            name="FedAVG(d)"+str(self.cyclic_num_bits_schedule)+ "-infer"+str(self.inference_bits)+"-"+str(args.partition_method) + "r" + str(args.comm_round) + "-e" + str(
+            name="FedAVG(d)"+str(args.cyclic_num_bits_schedule)+ "-infer"+str(args.inference_bits)+"-"+str(args.partition_method) + "r" + str(args.comm_round) + "-e" + str(
                 args.epochs) + "-lr" + str(
                 args.lr),
             config=args
