@@ -29,7 +29,7 @@ class FedAVGTrainer(object):
             self.optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.model.parameters()),
                                               lr=self.args.lr,
                                               weight_decay=self.args.wd, amsgrad=True)
-        self.scheduler = torch.optim.StepLR(self.optimizer, step_size=self.args.lr_decay_step_size, gamma=0.1)
+        self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.args.lr_decay_step_size, gamma=0.1)
         self.comm_round = 0 
     def update_model(self, weights):
         # logging.info("update_model. client_index = %d" % self.client_index)
