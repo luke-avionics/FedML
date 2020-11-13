@@ -72,7 +72,7 @@ class FedAVGTrainer(object):
             self.scheduler.step()
         self.comm_round+=1
         for g in self.optimizer.param_groups:
-            logging.info("===current learning rate===: "str(g['lr']))
+            logging.info("===current learning rate===: "+str(g['lr']))
             break
         self.first_run=False
 
