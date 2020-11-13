@@ -174,12 +174,13 @@ class CNN_DropOut(torch.nn.Module):
     def forward(self, x, num_bits=0):
         x = torch.unsqueeze(x, 1)
         x = self.conv2d_1(x, num_bits)
+        x = self.relu(x)
         x = self.conv2d_2(x, num_bits)
         x = self.relu(x)
         x = self.max_pooling(x)
         x = self.dropout_1(x)
         x = self.flatten(x)
-        x = self.linear_1(x, num_bits)
+        x = self.relu(self.linear_1(x, num_bits))
         x = self.dropout_2(x)
         x = self.softmax(self.linear_2(x, num_bits))
         return x
