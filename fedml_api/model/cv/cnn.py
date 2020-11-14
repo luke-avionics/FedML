@@ -169,7 +169,7 @@ class CNN_DropOut(torch.nn.Module):
         self.linear_2 = Linear(128, 10 if only_digits else 62)
         #self.linear_2 = nn.Linear(128, 10 if only_digits else 62)
         self.relu = nn.ReLU()
-        self.softmax = nn.Softmax(dim=1)
+        self.softmax = nn.LogSoftmax(dim=1)
 
     def forward(self, x, num_bits=0):
         x = torch.unsqueeze(x, 1)
