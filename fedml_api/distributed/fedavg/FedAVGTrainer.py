@@ -62,6 +62,8 @@ class FedAVGTrainer(object):
                     log_probs = self.model(x, num_bits=num_bits)
                 loss = self.criterion(log_probs, labels)
                 loss.backward()
+                g_norm=nn.utils.clip_grad_norm_(self.model.parameters(),0.9,'inf')
+                logging.info(str(g_norm))
                 self.optimizer.step()
                 batch_loss.append(loss.item())
             if len(batch_loss) > 0:

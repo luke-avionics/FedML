@@ -97,7 +97,7 @@ def load_partition_data_federated_emnist(dataset, data_dir, client_number=None, 
     if client_number is None:
         client_number = DEFAULT_CLIENT_NUMBER
 
-    train_data_global, test_data_global = get_dataloader(dataset, data_dir, batch_size, batch_size)
+    train_data_global, test_data_global = get_dataloader(dataset, data_dir, batch_size, batch_size*32)
     train_data_num = len(train_data_global)
     test_data_num = len(test_data_global)
 
@@ -111,12 +111,12 @@ def load_partition_data_federated_emnist(dataset, data_dir, client_number=None, 
     train_h5.close()
 
     for client_idx in range(client_number):
-        train_data_local, test_data_local = get_dataloader(dataset, data_dir, batch_size, batch_size, client_idx)
+        train_data_local, test_data_local = get_dataloader(dataset, data_dir, batch_size, batch_size*32, client_idx)
         local_data_num = len(train_data_local) + len(test_data_local)
         data_local_num_dict[client_idx] = local_data_num
         # logging.info("client_idx = %d, local_sample_number = %d" % (client_idx, local_data_num))
-        # logging.info("client_idx = %d, batch_num_train_local = %d, batch_num_test_local = %d" % (
-        #     client_idx, len(train_data_local), len(test_data_local)))
+        logging.info("client_idx = %d, batch_num_train_local = %d, batch_num_test_local = %d" % (
+             client_idx, len(train_data_local), len(test_data_local)))
         train_data_local_dict[client_idx] = train_data_local
         test_data_local_dict[client_idx] = test_data_local
 

@@ -106,10 +106,10 @@ class FedAVGAggregator(object):
             test_losses = []
             for client_idx in range(self.args.client_num_in_total):
                 # train data
-                train_tot_correct, train_num_sample, train_loss = self._infer(self.train_data_local_dict[client_idx])
-                train_tot_corrects.append(copy.deepcopy(train_tot_correct))
-                train_num_samples.append(copy.deepcopy(train_num_sample))
-                train_losses.append(copy.deepcopy(train_loss))
+                # train_tot_correct, train_num_sample, train_loss = self._infer(self.train_data_local_dict[client_idx])
+                # train_tot_corrects.append(copy.deepcopy(train_tot_correct))
+                # train_num_samples.append(copy.deepcopy(train_num_sample))
+                # train_losses.append(copy.deepcopy(train_loss))
 
                 # test data
                 test_tot_correct, test_num_sample, test_loss = self._infer(self.test_data_local_dict[client_idx])
@@ -125,12 +125,12 @@ class FedAVGAggregator(object):
                     break
 
             # test on training dataset
-            train_acc = sum(train_tot_corrects) / sum(train_num_samples)
-            train_loss = sum(train_losses) / sum(train_num_samples)
-            wandb.log({"Train/Acc": train_acc, "round": round_idx},commit=False)
-            wandb.log({"Train/Loss": train_loss, "round": round_idx},commit=False)
-            stats = {'training_acc': train_acc, 'training_loss': train_loss}
-            logging.info(stats)
+            # train_acc = sum(train_tot_corrects) / sum(train_num_samples)
+            # train_loss = sum(train_losses) / sum(train_num_samples)
+            # wandb.log({"Train/Acc": train_acc, "round": round_idx},commit=False)
+            # wandb.log({"Train/Loss": train_loss, "round": round_idx},commit=False)
+            # stats = {'training_acc': train_acc, 'training_loss': train_loss}
+            # logging.info(stats)
 
             # test on test dataset
             test_acc = sum(test_tot_corrects) / sum(test_num_samples)
