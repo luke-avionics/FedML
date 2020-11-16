@@ -104,7 +104,7 @@ class FedAVGAggregator(object):
             test_num_samples = []
             test_tot_corrects = []
             test_losses = []
-            tmp_glb_dict=self.model.state_dict()
+            #tmp_glb_dict=self.model.state_dict()
             for idx, client_idx in enumerate(client_indexes):
                 # train data
                 train_tot_correct, train_num_sample, train_loss = self._infer_test(self.train_data_local_dict[client_idx],idx)
@@ -124,7 +124,7 @@ class FedAVGAggregator(object):
                 """
                 if self.args.ci == 1:
                     break
-            self.model.load_state_dict(tmp_glb_dict)
+            #self.model.load_state_dict(tmp_glb_dict)
             # test on training dataset
             train_acc = sum(train_tot_corrects) / sum(train_num_samples)
             train_loss = sum(train_losses) / sum(train_num_samples)

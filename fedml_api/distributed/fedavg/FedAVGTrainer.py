@@ -20,6 +20,7 @@ class FedAVGTrainer(object):
         self.args = args
         self.model = model
         self.first_run= True
+        self.glb_epoch=0
         # logging.info(self.model)
         self.model.to(self.device)
         self.criterion = nn.CrossEntropyLoss().to(self.device)
@@ -50,22 +51,23 @@ class FedAVGTrainer(object):
             if len(self.args.cyclic_num_bits_schedule)==0:
                 num_bits = 0
             else:
-                num_bits = self.cyclic_adjust_precision(epoch)
+                num_bits = self.cyclic_adjust_precision(self.glb_epoch)
             batch_loss = []
             for batch_idx, (x, labels) in enumerate(self.train_local):
                 # logging.info(images.shape)
                 x, labels = x.to(self.device), labels.to(self.device)
                 self.optimizer.zero_grad()
-                if epoch < 10 and  self.first_run:
-                    log_probs = self.model(x, num_bits=0)
-                else:
-                    log_probs = self.model(x, num_bits=num_bits)
+                # if epoch < 10 and  self.first_run:
+                #     log_probs = self.model(x, num_bits=0)
+                # else:
+                log_probs = self.model(x, num_bits=num_bits)
                 loss = self.criterion(log_probs, labels)
                 loss.backward()
                 g_norm=nn.utils.clip_grad_norm_(self.model.parameters(),0.9,'inf')
                 #logging.info(str(g_norm))
                 self.optimizer.step()
                 batch_loss.append(loss.item())
+            self.glb_epoch+=1
             if len(batch_loss) > 0:
                 epoch_loss.append(sum(batch_loss) / len(batch_loss))
                 logging.info('(client {}. Local Training Epoch: {} \tLoss: {:.6f}'.format(self.client_index,
