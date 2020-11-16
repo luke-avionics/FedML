@@ -63,7 +63,7 @@ class FedAVGTrainer(object):
                 loss = self.criterion(log_probs, labels)
                 loss.backward()
                 g_norm=nn.utils.clip_grad_norm_(self.model.parameters(),0.9,'inf')
-                logging.info(str(g_norm))
+                #logging.info(str(g_norm))
                 self.optimizer.step()
                 batch_loss.append(loss.item())
             if len(batch_loss) > 0:
@@ -116,7 +116,18 @@ class FedAVGTrainer(object):
                 #[2-32]
                 sch=[2,12,22,32,32,22,12,2,12,22,32,22,12,2,12,22,32,22,12,2]
             elif self.args.cyclic_num_bits_schedule[0]==3 and self.args.cyclic_num_bits_schedule[1]==8:
-                sch=[3, 4, 5, 6, 8, 8, 6, 5, 4, 3, 3, 4, 5, 6, 8, 8, 6, 5, 4, 3]
+                sch=[3, 4, 5, 6, 7, 8, 8, 7, 8, 5, 4, 3, 3, 4, 5, 6, 7, 8, 8, 8]
+            elif self.args.cyclic_num_bits_schedule[0]==8 and self.args.cyclic_num_bits_schedule[1]==17:
+                sch=[4,8,12,16,16,12,8,4,8,12,16,12,8,4,8,12,16,16,16,16]
+            elif self.args.cyclic_num_bits_schedule[0]==2 and self.args.cyclic_num_bits_schedule[1]==4:
+                sch=[2,3,4,3,2,3,4,3,2,3,4,3,2,3,4,3,2,4,3,2]
+            elif self.args.cyclic_num_bits_schedule[0]==4 and self.args.cyclic_num_bits_schedule[1]==33:
+                sch=[4,11,18,25,32,32,25,18,11,4, 4, 7, 10, 13, 16, 19, 22, 25, 28, 32]
+            elif self.args.cyclic_num_bits_schedule[0]==3 and self.args.cyclic_num_bits_schedule[1]==33:
+                sch=[3, 10, 17, 24, 32,32,24,17,10,3, 3, 6, 9, 12, 15, 19, 22, 25, 28, 32]
+            elif self.args.cyclic_num_bits_schedule[0]==3 and self.args.cyclic_num_bits_schedule[1]==17:
+                sch=[3, 4, 4, 8, 16,16,8,4,4,3, 3, 4, 4, 5, 8, 12, 16, 24, 28, 0]
+
         else:
             if self.args.cyclic_num_bits_schedule[0]==4 and self.args.cyclic_num_bits_schedule[1]==8:
                 #[4-8]

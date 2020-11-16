@@ -105,9 +105,9 @@ class FedAVGAggregator(object):
             test_tot_corrects = []
             test_losses = []
             tmp_glb_dict=self.model.state_dict()
-            for client_idx in client_indexes:
+            for idx, client_idx in enumerate(client_indexes):
                 # train data
-                train_tot_correct, train_num_sample, train_loss = self._infer_test(self.train_data_local_dict[client_idx],client_idx)
+                train_tot_correct, train_num_sample, train_loss = self._infer_test(self.train_data_local_dict[client_idx],idx)
                 train_tot_corrects.append(copy.deepcopy(train_tot_correct))
                 train_num_samples.append(copy.deepcopy(train_num_sample))
                 train_losses.append(copy.deepcopy(train_loss))
@@ -129,7 +129,7 @@ class FedAVGAggregator(object):
             train_acc = sum(train_tot_corrects) / sum(train_num_samples)
             train_loss = sum(train_losses) / sum(train_num_samples)
             wandb.log({"Train/Acc": train_acc, "round": round_idx},commit=False)
-            wandb.log({"Train/Loss": train_loss, "round": round_idx},commit=False)
+            wandb.log({"Train/Loss": train_loss, "round": round_idx})
             stats = {'training_acc': train_acc, 'training_loss': train_loss}
             logging.info(stats)
 

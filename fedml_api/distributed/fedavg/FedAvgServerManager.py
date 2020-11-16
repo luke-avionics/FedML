@@ -14,7 +14,7 @@ class FedAVGServerManager(ServerManager):
         self.round_num = args.comm_round
         self.round_idx = 0
         self.traffic_count=0
-        self.client_indexes[]
+        self.client_indexes=[]
     def run(self):
         super().run()
 
@@ -24,7 +24,7 @@ class FedAVGServerManager(ServerManager):
                                                          self.args.client_num_per_round)
         global_model_params = self.aggregator.get_global_model_params()
         for process_id in range(1, self.size):
-            self.send_message_init_config(process_id, global_model_params, client_indexes[process_id-1])
+            self.send_message_init_config(process_id, global_model_params, self.client_indexes[process_id-1])
 
     def register_message_receive_handlers(self):
         self.register_message_receive_handler(MyMessage.MSG_TYPE_C2S_SEND_MODEL_TO_SERVER,
