@@ -94,7 +94,7 @@ class FedAVGAggregator(object):
         logging.info("client_indexes = %s" % str(client_indexes))
         return client_indexes
 
-    def test_on_all_clients(self, round_idx,traffic_count):
+    def test_on_all_clients(self, round_idx,traffic_count,client_indexes):
         if round_idx % self.args.frequency_of_the_test == 0 or round_idx == self.args.comm_round - 1:
             logging.info("################local_test_on_all_clients : {}".format(round_idx))
             train_num_samples = []
@@ -104,18 +104,19 @@ class FedAVGAggregator(object):
             test_num_samples = []
             test_tot_corrects = []
             test_losses = []
-            for client_idx in range(self.args.client_num_in_total):
+            tmp_glb_dict=self.model.state_dict()
+            for client_idx in client_indexes:
                 # train data
-                # train_tot_correct, train_num_sample, train_loss = self._infer(self.train_data_local_dict[client_idx])
-                # train_tot_corrects.append(copy.deepcopy(train_tot_correct))
-                # train_num_samples.append(copy.deepcopy(train_num_sample))
-                # train_losses.append(copy.deepcopy(train_loss))
+                train_tot_correct, train_num_sample, train_loss = self._infer_test(self.train_data_local_dict[client_idx],client_idx)
+                train_tot_corrects.append(copy.deepcopy(train_tot_correct))
+                train_num_samples.append(copy.deepcopy(train_num_sample))
+                train_losses.append(copy.deepcopy(train_loss))
 
                 # test data
-                test_tot_correct, test_num_sample, test_loss = self._infer(self.test_data_local_dict[client_idx])
-                test_tot_corrects.append(copy.deepcopy(test_tot_correct))
-                test_num_samples.append(copy.deepcopy(test_num_sample))
-                test_losses.append(copy.deepcopy(test_loss))
+                # test_tot_correct, test_num_sample, test_loss = self._infer(self.test_data_local_dict[client_idx])
+                # test_tot_corrects.append(copy.deepcopy(test_tot_correct))
+                # test_num_samples.append(copy.deepcopy(test_num_sample))
+                # test_losses.append(copy.deepcopy(test_loss))
 
                 """
                 Note: CI environment is CPU-based computing. 
@@ -123,23 +124,23 @@ class FedAVGAggregator(object):
                 """
                 if self.args.ci == 1:
                     break
-
+            self.model.load_state_dict(tmp_glb_dict)
             # test on training dataset
-            # train_acc = sum(train_tot_corrects) / sum(train_num_samples)
-            # train_loss = sum(train_losses) / sum(train_num_samples)
-            # wandb.log({"Train/Acc": train_acc, "round": round_idx},commit=False)
-            # wandb.log({"Train/Loss": train_loss, "round": round_idx},commit=False)
-            # stats = {'training_acc': train_acc, 'training_loss': train_loss}
-            # logging.info(stats)
+            train_acc = sum(train_tot_corrects) / sum(train_num_samples)
+            train_loss = sum(train_losses) / sum(train_num_samples)
+            wandb.log({"Train/Acc": train_acc, "round": round_idx},commit=False)
+            wandb.log({"Train/Loss": train_loss, "round": round_idx},commit=False)
+            stats = {'training_acc': train_acc, 'training_loss': train_loss}
+            logging.info(stats)
 
             # test on test dataset
-            test_acc = sum(test_tot_corrects) / sum(test_num_samples)
-            test_loss = sum(test_losses) / sum(test_num_samples)
-            wandb.log({"Test/Acc": test_acc, "round": round_idx},commit=False)
-            wandb.log({"Test/Loss": test_loss, "round": round_idx},commit=False)
-            wandb.log({"Test/Acc": test_acc, "traffic_volume": traffic_count*2})
-            stats = {'test_acc': test_acc, 'test_loss': test_loss}
-            logging.info(stats)
+            # test_acc = sum(test_tot_corrects) / sum(test_num_samples)
+            # test_loss = sum(test_losses) / sum(test_num_samples)
+            # wandb.log({"Test/Acc": test_acc, "round": round_idx},commit=False)
+            # wandb.log({"Test/Loss": test_loss, "round": round_idx},commit=False)
+            # wandb.log({"Test/Acc": test_acc, "traffic_volume": traffic_count*2})
+            # stats = {'test_acc': test_acc, 'test_loss': test_loss}
+            # logging.info(stats)
 
     def _infer(self, test_data):
         self.model.eval()
@@ -161,3 +162,25 @@ class FedAVGAggregator(object):
                 test_total += target.size(0)
 
         return test_acc, test_total, test_loss
+
+    def _infer_test(self, test_data, index):
+        self.model.load_state_dict(self.model_dict[index])
+        self.model.eval()
+        self.model.to(self.device)
+        test_loss = test_acc = test_total = 0.
+        criterion = nn.CrossEntropyLoss().to(self.device)
+        with torch.no_grad():
+            for batch_idx, (x, target) in enumerate(test_data):
+                x = x.to(self.device)
+                target = target.to(self.device)
+                pred = self.model(x, num_bits=self.args.inference_bits)
+                loss = criterion(pred, target)
+                _, predicted = torch.max(pred, -1)
+                correct = predicted.eq(target).sum()
+
+                test_acc += correct.item()
+                test_loss += loss.item() * target.size(0)
+                test_total += target.size(0)
+
+        return test_acc, test_total, test_loss
+

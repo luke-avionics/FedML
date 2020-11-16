@@ -14,12 +14,13 @@ class FedAVGServerManager(ServerManager):
         self.round_num = args.comm_round
         self.round_idx = 0
         self.traffic_count=0
+        self.client_indexes[]
     def run(self):
         super().run()
 
     def send_init_msg(self):
         # sampling clients
-        client_indexes = self.aggregator.client_sampling(self.round_idx, self.args.client_num_in_total,
+        self.client_indexes = self.aggregator.client_sampling(self.round_idx, self.args.client_num_in_total,
                                                          self.args.client_num_per_round)
         global_model_params = self.aggregator.get_global_model_params()
         for process_id in range(1, self.size):
@@ -52,7 +53,7 @@ class FedAVGServerManager(ServerManager):
         if b_all_received:
             global_model_params = self.aggregator.aggregate()
             try:
-                self.aggregator.test_on_all_clients(self.round_idx,self.traffic_count)
+                self.aggregator.test_on_all_clients(self.round_idx,self.traffic_count,self.client_indexes)
             except Exception as e:
                 raise Exception(str(e))
             # start the next round
@@ -62,7 +63,7 @@ class FedAVGServerManager(ServerManager):
                 return
 
             # sampling clients
-            client_indexes = self.aggregator.client_sampling(self.round_idx, self.args.client_num_in_total,
+            self.client_indexes = self.aggregator.client_sampling(self.round_idx, self.args.client_num_in_total,
                                                              self.args.client_num_per_round)
             print("size = %d" % self.size)
             if self.args.is_mobile == 1:
@@ -70,7 +71,7 @@ class FedAVGServerManager(ServerManager):
                 global_model_params = transform_tensor_to_list(global_model_params)
 
             for receiver_id in range(1, self.size):
-                self.send_message_sync_model_to_client(receiver_id, global_model_params, client_indexes[receiver_id-1])
+                self.send_message_sync_model_to_client(receiver_id, global_model_params, self.client_indexes[receiver_id-1])
 
     def send_message_init_config(self, receive_id, global_model_params, client_index):
         message = Message(MyMessage.MSG_TYPE_S2C_INIT_CONFIG, self.get_sender_id(), receive_id)
