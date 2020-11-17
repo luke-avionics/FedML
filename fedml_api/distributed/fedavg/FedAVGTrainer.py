@@ -92,7 +92,7 @@ class FedAVGTrainer(object):
             return self.args.cyclic_num_bits_schedule[0]
 
 
-        if self.args.epochs % 20==0:
+        if self.args.epochs % 20==0 or self.args.epochs==1:
             if self.args.cyclic_num_bits_schedule[0]==4 and self.args.cyclic_num_bits_schedule[1]==8:
                 #[4-8]
                 sch=[4,6,7,8,7,6,4,6,7,8,8,7,6,4,6,7,8,7,6,4]

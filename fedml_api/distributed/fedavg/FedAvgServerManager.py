@@ -71,7 +71,7 @@ class FedAVGServerManager(ServerManager):
             #     global_model_params = transform_tensor_to_list(global_model_params)
 
             for receiver_id in range(1, self.size):
-                self.send_message_sync_model_to_client(receiver_id, self.aggregator.model_dict[receive_id-1], self.client_indexes[receiver_id-1])
+                self.send_message_sync_model_to_client(receiver_id, self.aggregator.model_dict[receiver_id-1], self.client_indexes[receiver_id-1])
 
     def send_message_init_config(self, receive_id, global_model_params, client_index):
         message = Message(MyMessage.MSG_TYPE_S2C_INIT_CONFIG, self.get_sender_id(), receive_id)
