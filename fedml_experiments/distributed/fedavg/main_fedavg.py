@@ -5,14 +5,12 @@ import random
 import socket
 import sys
 
-import traceback
-from mpi4py import MPI
-
 import numpy as np
 import psutil
 import setproctitle
 import torch
 import wandb
+
 # add the FedML root directory to the python path
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.getcwd(), "../../../")))
@@ -24,24 +22,16 @@ from fedml_api.data_preprocessing.shakespeare.data_loader import load_partition_
 from fedml_api.data_preprocessing.stackoverflow_lr.data_loader import load_partition_data_federated_stackoverflow_lr
 from fedml_api.data_preprocessing.stackoverflow_nwp.data_loader import load_partition_data_federated_stackoverflow_nwp
 from fedml_api.data_preprocessing.MNIST.data_loader import load_partition_data_mnist
-from fedml_api.data_preprocessing.ImageNet.data_loader import load_partition_data_ImageNet
-from fedml_api.data_preprocessing.Landmarks.data_loader import load_partition_data_landmarks
 
 from fedml_api.data_preprocessing.cifar10.data_loader import load_partition_data_cifar10
 from fedml_api.data_preprocessing.cifar100.data_loader import load_partition_data_cifar100
 from fedml_api.data_preprocessing.cinic10.data_loader import load_partition_data_cinic10
-
 from fedml_api.model.cv.cnn import CNN_DropOut
 from fedml_api.model.cv.resnet_gn import resnet18
 from fedml_api.model.cv.mobilenet import mobilenet
-from fedml_api.model.cv.resnet import resnet56
+from fedml_api.model.cv.resnet import resnet20, resnet38, resnet74, resnet110, resnet110
 from fedml_api.model.nlp.rnn import RNN_OriginalFedAvg, RNN_StackOverFlow
 from fedml_api.model.linear.lr import LogisticRegression
-from fedml_api.model.cv.mobilenet_v3 import MobileNetV3
-from fedml_api.model.cv.efficientnet import EfficientNet
-
-
-
 from fedml_api.distributed.fedavg.FedAvgAPI import FedML_init, FedML_FedAvg_distributed
 
 
@@ -75,7 +65,7 @@ def add_args(parser):
     parser.add_argument('--batch_size', type=int, default=64, metavar='N',
                         help='input batch size for training (default: 64)')
 
-    parser.add_argument('--client_optimizer', type=str, default='adam',
+    parser.add_argument('--client_optimizer', type=str, default='sgd',
                         help='SGD with momentum; adam')
 
     parser.add_argument('--lr', type=float, default=0.001, metavar='LR',
@@ -100,7 +90,14 @@ def add_args(parser):
 
     parser.add_argument('--gpu_num_per_server', type=int, default=4,
                         help='gpu_num_per_server')
-
+    parser.add_argument('--inference_bits', default=0, type=int,  
+                        help='precision used for inference')                 
+    parser.add_argument('--cyclic_period', default=1, type=float, 
+                        help='cyclic schedule period for weight/act precision')
+    parser.add_argument('--cyclic_num_bits_schedule', default=[3, 8], type=int, nargs='*',
+                        help='cyclic schedule for weight/act precision')
+    parser.add_argument('--lr_decay_step_size', default=2000, type=int,  
+                        help='lr decay step size')   
     parser.add_argument('--ci', type=int, default=0,
                         help='CI')
     args = parser.parse_args()
@@ -158,43 +155,6 @@ def load_data(args, dataset_name):
         train_data_local_num_dict, train_data_local_dict, test_data_local_dict, \
         class_num = load_partition_data_federated_stackoverflow_nwp(args.dataset, args.data_dir)
         args.client_num_in_total = client_num
-    elif dataset_name == "ILSVRC2012":
-        logging.info("load_data. dataset_name = %s" % dataset_name)
-        train_data_num, test_data_num, train_data_global, test_data_global, \
-        train_data_local_num_dict, train_data_local_dict, test_data_local_dict, \
-        class_num = load_partition_data_ImageNet(dataset=dataset_name, data_dir=args.data_dir,
-            partition_method=None, partition_alpha=None, 
-            client_number=args.client_num_in_total, batch_size=args.batch_size)
-
-    elif dataset_name == "gld23k":
-        logging.info("load_data. dataset_name = %s" % dataset_name)
-        args.client_num_in_total = 233
-        fed_train_map_file = os.path.join(args.data_dir, 'mini_gld_train_split.csv')
-        fed_test_map_file = os.path.join(args.data_dir, 'mini_gld_test.csv')
-        args.data_dir = os.path.join(args.data_dir, 'images')
-
-        train_data_num, test_data_num, train_data_global, test_data_global, \
-        train_data_local_num_dict, train_data_local_dict, test_data_local_dict, \
-        class_num = load_partition_data_landmarks(dataset=dataset_name, data_dir=args.data_dir,
-            fed_train_map_file=fed_train_map_file, fed_test_map_file=fed_test_map_file,
-            partition_method=None, partition_alpha=None, 
-            client_number=args.client_num_in_total, batch_size=args.batch_size)
-
-    elif dataset_name == "gld160k":
-        logging.info("load_data. dataset_name = %s" % dataset_name)
-        args.client_num_in_total = 1262
-        fed_train_map_file = os.path.join(args.data_dir, 'federated_train.csv')
-        fed_test_map_file = os.path.join(args.data_dir, 'test.csv')
-        args.data_dir = os.path.join(args.data_dir, 'images')
-
-        train_data_num, test_data_num, train_data_global, test_data_global, \
-        train_data_local_num_dict, train_data_local_dict, test_data_local_dict, \
-        class_num = load_partition_data_landmarks(dataset=dataset_name, data_dir=args.data_dir,
-            fed_train_map_file=fed_train_map_file, fed_test_map_file=fed_test_map_file,
-            partition_method=None, partition_alpha=None, 
-            client_number=args.client_num_in_total, batch_size=args.batch_size)
-
-
     else:
         if dataset_name == "cifar10":
             data_loader = load_partition_data_cifar10
@@ -205,12 +165,13 @@ def load_data(args, dataset_name):
         else:
             data_loader = load_partition_data_cifar10
 
-        train_data_num, test_data_num, train_data_global, test_data_global, \
-        train_data_local_num_dict, train_data_local_dict, test_data_local_dict, \
+        train_data_num, test_data_num, train_data_global, val_data_global, test_data_global, \
+        train_data_local_num_dict, train_data_local_dict, val_data_local_dict, test_data_local_dict, \
         class_num = data_loader(args.dataset, args.data_dir, args.partition_method,
                                 args.partition_alpha, args.client_num_in_total, args.batch_size)
-    dataset = [train_data_num, test_data_num, train_data_global, test_data_global,
-               train_data_local_num_dict, train_data_local_dict, test_data_local_dict, class_num]
+
+    dataset = [train_data_num, test_data_num, train_data_global, val_data_global, test_data_global,
+               train_data_local_num_dict, train_data_local_dict, val_data_local_dict, test_data_local_dict, class_num]
     return dataset
 
 
@@ -220,15 +181,15 @@ def create_model(args, model_name, output_dim):
     if model_name == "lr" and args.dataset == "mnist":
         logging.info("LogisticRegression + MNIST")
         model = LogisticRegression(28 * 28, output_dim)
-    elif model_name == "rnn" and args.dataset == "shakespeare":
-        logging.info("RNN + shakespeare")
-        model = RNN_OriginalFedAvg()
     elif model_name == "cnn" and args.dataset == "femnist":
         logging.info("CNN + FederatedEMNIST")
         model = CNN_DropOut(False)
     elif model_name == "resnet18_gn" and args.dataset == "fed_cifar100":
         logging.info("ResNet18_GN + Federated_CIFAR100")
         model = resnet18()
+    elif model_name == "rnn" and args.dataset == "shakespeare":
+        logging.info("RNN + shakespeare")
+        model = RNN_OriginalFedAvg()
     elif model_name == "rnn" and args.dataset == "fed_shakespeare":
         logging.info("RNN + fed_shakespeare")
         model = RNN_OriginalFedAvg()
@@ -238,17 +199,12 @@ def create_model(args, model_name, output_dim):
     elif model_name == "rnn" and args.dataset == "stackoverflow_nwp":
         logging.info("CNN + stackoverflow_nwp")
         model = RNN_StackOverFlow()
-    elif model_name == "resnet56":
-        model = resnet56(class_num=output_dim)
+    elif model_name == "resnet20":
+        model = resnet20(class_num=output_dim)
+    elif model_name == "resnet74":
+        model = resnet74(class_num=output_dim)
     elif model_name == "mobilenet":
         model = mobilenet(class_num=output_dim)
-    # TODO
-    elif model_name == 'mobilenet_v3':
-        '''model_mode \in {LARGE: 5.15M, SMALL: 2.94M}'''
-        model = MobileNetV3(model_mode='LARGE')
-    elif model_name == 'efficientnet':
-        model = EfficientNet()
-
     return model
 
 
@@ -282,8 +238,7 @@ if __name__ == "__main__":
     setproctitle.setproctitle(str_process_name)
 
     # customize the log format
-    # logging.basicConfig(level=logging.INFO,
-    logging.basicConfig(level=logging.DEBUG,
+    logging.basicConfig(level=logging.INFO,
                         format=str(
                             process_id) + ' - %(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s',
                         datefmt='%a, %d %b %Y %H:%M:%S')
@@ -293,13 +248,12 @@ if __name__ == "__main__":
                  ", process ID = " + str(os.getpid()) +
                  ", process Name = " + str(psutil.Process(os.getpid())))
 
-
     # initialize the wandb machine learning experimental tracking platform (https://www.wandb.com/).
-    if process_id == 0:
+    if process_id == 0 or 1:
         wandb.init(
             # project="federated_nas",
             project="fedml",
-            name="FedAVG(d)" + str(args.partition_method) + "r" + str(args.comm_round) + "-e" + str(
+            name="FedAVG(d)"+str(args.model)+str(args.dataset)+str(args.batch_size)+str(args.cyclic_num_bits_schedule)+ "-infer"+str(args.inference_bits)+"-"+str(args.partition_method) + "r" + str(args.comm_round) + "-e" + str(
                 args.epochs) + "-lr" + str(
                 args.lr),
             config=args
@@ -327,22 +281,15 @@ if __name__ == "__main__":
 
     # load data
     dataset = load_data(args, args.dataset)
-    [train_data_num, test_data_num, train_data_global, test_data_global,
-     train_data_local_num_dict, train_data_local_dict, test_data_local_dict, class_num] = dataset
+    [train_data_num, test_data_num, train_data_global, val_data_global, test_data_global,
+     train_data_local_num_dict, train_data_local_dict, val_data_local_dict, test_data_local_dict, class_num] = dataset
 
     # create model.
     # Note if the model is DNN (e.g., ResNet), the training will be very slow.
     # In this case, please use our FedML distributed version (./fedml_experiments/distributed_fedavg)
-    model = create_model(args, model_name=args.model, output_dim=dataset[7])
+    model = create_model(args, model_name=args.model, output_dim=dataset[9])
 
-    try:
     # start "federated averaging (FedAvg)"
-        FedML_FedAvg_distributed(process_id, worker_number, device, comm,
-                             model, train_data_num, train_data_global, test_data_global,
-                             train_data_local_num_dict, train_data_local_dict, test_data_local_dict, args)
-    except Exception as e:
-        print(e)
-        logging.info('traceback.format_exc():\n%s' % traceback.format_exc())
-        MPI.COMM_WORLD.Abort()
-
-
+    FedML_FedAvg_distributed(process_id, worker_number, device, comm,
+                             model, train_data_num, train_data_global, val_data_global, test_data_global,
+                             train_data_local_num_dict, train_data_local_dict, val_data_local_dict, test_data_local_dict, args)
