@@ -11,6 +11,8 @@ import setproctitle
 import torch
 import wandb
 
+import logging
+
 # add the FedML root directory to the python path
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.getcwd(), "../../../")))
@@ -201,6 +203,14 @@ def create_model(args, model_name, output_dim):
         model = RNN_StackOverFlow()
     elif model_name == "resnet20":
         model = resnet20(class_num=output_dim)
+    elif model_name == "resnet38":
+        try:
+            # logging.info('Test model!!!!!!!!!!!!!!!!!!!!!!!!!!')
+            model = resnet38(class_num=output_dim)
+        except Exception as error:
+            logging.info(str(error))
+    elif model_name == "resnet74":
+        model = resnet74(class_num=output_dim)
     elif model_name == "mobilenet":
         model = mobilenet(class_num=output_dim)
     return model
@@ -250,7 +260,7 @@ if __name__ == "__main__":
     if process_id == 0:
         wandb.init(
             # project="federated_nas",
-            project="cpt_test",
+            project="cpt_test_12-17",
             name="FedAVG(d)"+str(args.model)+str(args.dataset)+str(args.batch_size)+str(args.cyclic_num_bits_schedule)+ "-infer"+str(args.inference_bits)+"-"+str(args.partition_method) + "r" + str(args.comm_round) + "-e" + str(
                 args.epochs) + "-lr" + str(
                 args.lr),

@@ -240,7 +240,7 @@ class QConv2d(nn.Conv2d):
                                            reduce_dim=None)
         qweight = quantize(self.weight, qparams=weight_qparams)
         output = F.conv2d(qinput, qweight, qbias, self.stride, self.padding, self.dilation, self.groups)
-        # output = quantize_grad(output, num_bits=num_grad_bits, flatten_dims=(1, -1))
+        output = quantize_grad(output, num_bits=8, flatten_dims=(1, -1))
 
         return output
 

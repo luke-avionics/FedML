@@ -113,10 +113,11 @@ class FedAVGAggregator(object):
                 train_losses.append(copy.deepcopy(train_loss))
 
                 # test data
-                # test_tot_correct, test_num_sample, test_loss = self._infer(self.test_data_local_dict[client_idx])
-                # test_tot_corrects.append(copy.deepcopy(test_tot_correct))
-                # test_num_samples.append(copy.deepcopy(test_num_sample))
-                # test_losses.append(copy.deepcopy(test_loss))
+                test_tot_correct, test_num_sample, test_loss = self._infer(self.test_data_local_dict[client_idx])
+                #test_tot_correct, test_num_sample, test_loss = self._infer_test(self.test_data_local_dict[client_idx],idx)
+                test_tot_corrects.append(copy.deepcopy(test_tot_correct))
+                test_num_samples.append(copy.deepcopy(test_num_sample))
+                test_losses.append(copy.deepcopy(test_loss))
 
                 """
                 Note: CI environment is CPU-based computing. 
@@ -129,18 +130,18 @@ class FedAVGAggregator(object):
             train_acc = sum(train_tot_corrects) / sum(train_num_samples)
             train_loss = sum(train_losses) / sum(train_num_samples)
             wandb.log({"Train/Acc": train_acc, "round": round_idx},commit=False)
-            wandb.log({"Train/Loss": train_loss, "round": round_idx})
+            wandb.log({"Train/Loss": train_loss, "round": round_idx}, commit=False)
             stats = {'training_acc': train_acc, 'training_loss': train_loss}
             logging.info(stats)
 
             # test on test dataset
-            # test_acc = sum(test_tot_corrects) / sum(test_num_samples)
-            # test_loss = sum(test_losses) / sum(test_num_samples)
-            # wandb.log({"Test/Acc": test_acc, "round": round_idx},commit=False)
-            # wandb.log({"Test/Loss": test_loss, "round": round_idx},commit=False)
-            # wandb.log({"Test/Acc": test_acc, "traffic_volume": traffic_count*2})
-            # stats = {'test_acc': test_acc, 'test_loss': test_loss}
-            # logging.info(stats)
+            test_acc = sum(test_tot_corrects) / sum(test_num_samples)
+            test_loss = sum(test_losses) / sum(test_num_samples)
+            wandb.log({"Test/Acc": test_acc, "round": round_idx},commit=False)
+            wandb.log({"Test/Loss": test_loss, "round": round_idx},commit=False)
+            wandb.log({"Test/Acc": test_acc, "traffic_volume": traffic_count*2})
+            stats = {'test_acc': test_acc, 'test_loss': test_loss}
+            logging.info(stats)
 
     def _infer(self, test_data):
         self.model.eval()
