@@ -113,7 +113,7 @@ class FedAVGAggregator(object):
                 train_losses.append(copy.deepcopy(train_loss))
 
                 # test data
-                test_tot_correct, test_num_sample, test_loss = self._infer(self.test_data_local_dict[client_idx])
+                test_tot_correct, test_num_sample, test_loss = self._infer_test(self.test_data_local_dict[client_idx],idx)
                 #test_tot_correct, test_num_sample, test_loss = self._infer_test(self.test_data_local_dict[client_idx],idx)
                 test_tot_corrects.append(copy.deepcopy(test_tot_correct))
                 test_num_samples.append(copy.deepcopy(test_num_sample))

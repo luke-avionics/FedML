@@ -207,6 +207,7 @@ def create_model(args, model_name, output_dim):
         try:
             # logging.info('Test model!!!!!!!!!!!!!!!!!!!!!!!!!!')
             model = resnet38(class_num=output_dim)
+            logging.info(str(model))
         except Exception as error:
             logging.info(str(error))
     elif model_name == "resnet74":
