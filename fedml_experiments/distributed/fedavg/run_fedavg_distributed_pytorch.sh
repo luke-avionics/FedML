@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 
-CLIENT_NUM=8
-WORKER_NUM=8
+CLIENT_NUM=1
+WORKER_NUM=1
 SERVER_NUM=1
 GPU_NUM_PER_SERVER=4
 MODEL='resnet38'
-DISTRIBUTION='hetero'
-ROUND=2000
-EPOCH=10
-BATCH_SIZE=32
-LR='0.01'
-INFERENCE_BITS=0
-schedule=()
+DISTRIBUTION='homo'
+ROUND=160
+EPOCH=1
+BATCH_SIZE=128
+LR='0.1'
+INFERENCE_BITS=8
+schedule=(8 8)
 CYCLIC_NUM_BITS_SCHEDULE=${schedule[@]}
 LR_DECAY_STEP_SIZE=2000
-DATASET='cifar10'
-DATA_DIR="/home/yz87/FedML/fedml_experiments/distributed/fedavg"
+DATASET='cifar100'
+DATA_DIR="/home/yf22/dataset"
 
 PROCESS_NUM=`expr $WORKER_NUM + 1`
 echo $PROCESS_NUM
@@ -23,19 +23,18 @@ echo $PROCESS_NUM
 hostname > mpi_host_file
 
 mpirun -np $PROCESS_NUM -hostfile ./mpi_host_file python3 ./main_fedavg.py \
-  --gpu_server_num $SERVER_NUM \
-  --gpu_num_per_server $GPU_NUM_PER_SERVER \
-  --model $MODEL \
-  --dataset $DATASET \
-  --data_dir $DATA_DIR \
-  --partition_method $DISTRIBUTION  \
-  --client_num_in_total $CLIENT_NUM \
-  --client_num_per_round $WORKER_NUM \
-  --comm_round $ROUND \
-  --epochs $EPOCH \
-  --batch_size $BATCH_SIZE \
-  --lr $LR \
-  --inference_bits $INFERENCE_BITS \
-  --cyclic_num_bits_schedule $CYCLIC_NUM_BITS_SCHEDULE \
-  --lr_decay_step_size $LR_DECAY_STEP_SIZE
-
+  --gpu_server_num ${SERVER_NUM} \
+  --gpu_num_per_server ${GPU_NUM_PER_SERVER} \
+  --model ${MODEL} \
+  --dataset ${DATASET} \
+  --data_dir ${DATA_DIR} \
+  --partition_method ${DISTRIBUTION}  \
+  --client_num_in_total ${CLIENT_NUM} \
+  --client_num_per_round ${WORKER_NUM} \
+  --comm_round ${ROUND} \
+  --epochs ${EPOCH} \
+  --batch_size ${BATCH_SIZE} \
+  --lr ${LR} \
+  --inference_bits ${INFERENCE_BITS} \
+  --cyclic_num_bits_schedule ${CYCLIC_NUM_BITS_SCHEDULE} \
+  --lr_decay_step_size ${LR_DECAY_STEP_SIZE}
