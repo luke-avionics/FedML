@@ -107,13 +107,13 @@ class FedAVGAggregator(object):
             #tmp_glb_dict=self.model.state_dict()
             for idx, client_idx in enumerate(client_indexes):
                 # train data
-                train_tot_correct, train_num_sample, train_loss = self._infer_test(self.train_data_local_dict[client_idx],idx)
+                train_tot_correct, train_num_sample, train_loss = self._infer(self.train_data_local_dict[client_idx])
                 train_tot_corrects.append(copy.deepcopy(train_tot_correct))
                 train_num_samples.append(copy.deepcopy(train_num_sample))
                 train_losses.append(copy.deepcopy(train_loss))
 
                 # test data
-                test_tot_correct, test_num_sample, test_loss = self._infer_test(self.test_data_local_dict[client_idx],idx)
+                test_tot_correct, test_num_sample, test_loss = self._infer(self.test_data_local_dict[client_idx])
                 #test_tot_correct, test_num_sample, test_loss = self._infer_test(self.test_data_local_dict[client_idx],idx)
                 test_tot_corrects.append(copy.deepcopy(test_tot_correct))
                 test_num_samples.append(copy.deepcopy(test_num_sample))

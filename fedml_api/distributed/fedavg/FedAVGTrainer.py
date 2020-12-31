@@ -25,7 +25,7 @@ class FedAVGTrainer(object):
         self.model.to(self.device)
         self.criterion = nn.CrossEntropyLoss().to(self.device)
         if self.args.client_optimizer == "sgd":
-            self.optimizer = torch.optim.SGD(self.model.parameters(), momentum=0.9, lr=self.args.lr, weight_decay=5e-4)
+            self.optimizer = torch.optim.SGD(self.model.parameters(), momentum=0.9, lr=self.args.lr, weight_decay=1e-4)
         else:
             self.optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.model.parameters()),
                                               lr=self.args.lr,
@@ -34,7 +34,7 @@ class FedAVGTrainer(object):
         self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[lr_steps / 2, lr_steps * 3 / 4], gamma=0.1)
         self.comm_round = 0 
 
-        self.cyclic_period = 32
+        self.cyclic_period = 160
 
     def update_model(self, weights):
         # logging.info("update_model. client_index = %d" % self.client_index)
@@ -64,6 +64,11 @@ class FedAVGTrainer(object):
 
                     if (self.args.cyclic_num_bits_schedule[0]==0 or self.args.cyclic_num_bits_schedule[1]==0) :
                         num_bits = 0
+                    elif self.glb_epoch>=self.args.comm_round-6:
+                        num_bits = 8
+                    #elif self.glb_epoch>=self.args.comm_round-6:
+                    #    cyclic_period = int((self.args.comm_round * len(self.train_local)) / 32)
+                    #    num_bits = self.cyclic_adjust_precision(_iters, cyclic_period)
                     else:
                         num_bits = self.cyclic_adjust_precision(_iters, cyclic_period)
                     #logging.info('Right before data moving starts!!!!!')
@@ -99,6 +104,8 @@ class FedAVGTrainer(object):
         for g in self.optimizer.param_groups:
             logging.info("===current learning rate===: "+str(g['lr']))
             break
+        logging.info("========= number of batches =======: "+str(batch_idx+1))
+        logging.info("========= Transmitted bits ========: "+str(num_bits))
         self.first_run=False
 
         weights = self.model.cpu().state_dict()
