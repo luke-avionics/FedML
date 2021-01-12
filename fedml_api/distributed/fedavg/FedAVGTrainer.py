@@ -34,8 +34,8 @@ class FedAVGTrainer(object):
         self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[lr_steps / 2, lr_steps * 3 / 4], gamma=0.1)
         self.comm_round = 0 
 
-        self.cyclic_period = 160
-
+        self.cyclic_period = self.args.comm_round
+        self.lr_steps=lr_steps
     def update_model(self, weights):
         # logging.info("update_model. client_index = %d" % self.client_index)
         self.model.load_state_dict(weights)
@@ -60,15 +60,18 @@ class FedAVGTrainer(object):
                     #logging.info('Beginning of training on one batch !!!!!!!!!!!!!!!!!!!!!!!!!!')
 
                     _iters = self.glb_epoch * len(self.train_local) + batch_idx
-                    cyclic_period = int((self.args.comm_round * len(self.train_local)) / self.cyclic_period)
+                    cyclic_period = int((self.args.comm_round * len(self.train_local)) // self.cyclic_period)
 
                     if (self.args.cyclic_num_bits_schedule[0]==0 or self.args.cyclic_num_bits_schedule[1]==0) :
                         num_bits = 0
+                    #elif self.glb_epoch>=self.args.comm_round-3:
+                    #    num_bits = 8
                     elif self.glb_epoch>=self.args.comm_round-6:
-                        num_bits = 8
-                    #elif self.glb_epoch>=self.args.comm_round-6:
-                    #    cyclic_period = int((self.args.comm_round * len(self.train_local)) / 32)
-                    #    num_bits = self.cyclic_adjust_precision(_iters, cyclic_period)
+                        self.args.cyclic_num_bits_schedule=[4,8]
+                        cyclic_period = int((self.args.comm_round * len(self.train_local)) // 32)
+                        offset=self.offset_finder(self.args.cyclic_num_bits_schedule[1],cyclic_period,len(self.train_local),self.lr_steps)
+                        offseted_iters=min(max(0,_iters-offset),self.lr_steps)
+                        num_bits = self.cyclic_adjust_precision(offseted_iters, cyclic_period)
                     else:
                         num_bits = self.cyclic_adjust_precision(_iters, cyclic_period)
                     #logging.info('Right before data moving starts!!!!!')
@@ -115,7 +118,7 @@ class FedAVGTrainer(object):
             weights = transform_tensor_to_list(weights)
         return weights, self.local_sample_number
 
-    def cyclic_adjust_precision(self, _iters, cyclic_period, fixed_sch=True):
+    def cyclic_adjust_precision(self, _iters, cyclic_period, fixed_sch=True,print_bits=True):
         if self.args.cyclic_num_bits_schedule[0]==self.args.cyclic_num_bits_schedule[1]:
             return self.args.cyclic_num_bits_schedule[0]
 
@@ -132,8 +135,25 @@ class FedAVGTrainer(object):
         else:
             slope = - float(num_bit_max - num_bit_min)/down_period
             num_bits = round(slope * (current_iter-up_period)) + num_bit_max
-
-        if _iters % 50 == 0:
-            logging.info('num_bits = {} '.format(num_bits))
+        if print_bits:
+            if _iters % 50 == 0:
+                logging.info('num_bits = {} '.format(num_bits))
 
         return num_bits
+
+    def offset_finder(self, max_bit, cyclic_period, batch_num,total_iter):
+        for i in range(0,total_iter-1):
+            last=self.cyclic_adjust_precision(i, cyclic_period, print_bits=False)
+            new=self.cyclic_adjust_precision(i+1,cyclic_period, print_bits=False)
+            if last==max_bit and new==max_bit-1:
+                #print(i)
+                break
+        offset=0
+        for j in range(0,batch_num):
+            if (i-j) % batch_num ==0:
+                offset=-j
+                break
+            elif (i+j) % batch_num ==0:
+                offset=j
+                break
+        return offset
