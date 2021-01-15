@@ -4,7 +4,7 @@ import torch
 from torch import nn
 
 from fedml_api.distributed.fedavg.utils import transform_tensor_to_list
-
+from fedml_api.model.cv.quantize import calculate_qparams, quantize
 
 class FedAVGTrainer(object):
     def __init__(self, client_index, train_data_local_dict, train_data_local_num_dict, train_data_num, device, model,
@@ -116,6 +116,10 @@ class FedAVGTrainer(object):
         # transform Tensor to list
         if self.args.is_mobile == 1:
             weights = transform_tensor_to_list(weights)
+        if num_bits != 0:
+            weight_qparams = calculate_qparams(weights, num_bits=num_bits, flatten_dims=(1, -1),
+                                            reduce_dim=None)
+            weights = quantize(weights, qparams=weight_qparams)
         return weights, self.local_sample_number, num_bits
 
     def cyclic_adjust_precision(self, _iters, cyclic_period, fixed_sch=True,print_bits=True):

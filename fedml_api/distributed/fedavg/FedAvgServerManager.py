@@ -4,7 +4,7 @@ from fedml_api.distributed.fedavg.message_define import MyMessage
 from fedml_api.distributed.fedavg.utils import transform_tensor_to_list
 from fedml_core.distributed.communication.message import Message
 from fedml_core.distributed.server.server_manager import ServerManager
-
+from fedml_api.model.cv.quantize import calculate_qparams, quantize
 
 class FedAVGServerManager(ServerManager):
     def __init__(self, args, aggregator, comm=None, rank=0, size=0, backend="MPI"):
@@ -73,6 +73,10 @@ class FedAVGServerManager(ServerManager):
 
             for receiver_id in range(1, self.size):
                 #self.send_message_sync_model_to_client(receiver_id, self.aggregator.model_dict[receiver_id-1], self.client_indexes[receiver_id-1])
+                if num_bits != 0:
+                    weight_qparams = calculate_qparams(global_model_params, num_bits=num_bits, flatten_dims=(1, -1),
+                                                    reduce_dim=None)
+                    global_model_params = quantize(global_model_params, qparams=weight_qparams)
                 self.send_message_sync_model_to_client(receiver_id, global_model_params, self.client_indexes[receiver_id-1])
     def send_message_init_config(self, receive_id, global_model_params, client_index):
         message = Message(MyMessage.MSG_TYPE_S2C_INIT_CONFIG, self.get_sender_id(), receive_id)

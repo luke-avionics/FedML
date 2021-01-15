@@ -8,6 +8,7 @@ import numpy as np
 from torch import nn
 
 from fedml_api.distributed.fedavg.utils import transform_list_to_tensor
+from fedml_api.model.cv.quantize import calculate_qparams, quantize
 
 
 class FedAVGAggregator(object):
