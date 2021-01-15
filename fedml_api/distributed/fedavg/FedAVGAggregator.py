@@ -52,8 +52,17 @@ class FedAVGAggregator(object):
         for idx in range(self.worker_num):
             self.flag_client_model_uploaded_dict[idx] = False
         return True
+    def quantize_grad(self, grad,bits):
+        """quantize the tensor grad in s level on the absolute value coef wise"""
+        norm=torch.norm(grad)
+        s=torch.floor(2**(bits-1)/(torch.max(grad)/norm))
+        level_float = s * torch.abs(grad) / norm
+        previous_level = torch.floor(level_float)
+        is_next_level = torch.rand(*grad.shape) < (level_float - previous_level)
+        new_level = previous_level + is_next_level
+        return torch.sign(grad) * norm * new_level / s
 
-    def aggregate(self):
+    def aggregate(self,previous_global_model_params):
         start_time = time.time()
         model_list = []
         training_num = 0
@@ -76,6 +85,32 @@ class FedAVGAggregator(object):
                     averaged_params[k] = local_model_params[k] * w
                 else:
                     averaged_params[k] += local_model_params[k] * w
+        for k in averaged_params.keys():
+            if  ('running_var' not in k) and ('running_mean' not in k) and ('num_batches_tracked' not in k):
+                for i in range(0, len(model_list)):
+                    local_sample_number, local_model_params = model_list[i]
+                    w = local_sample_number / training_num
+                    if i == 0:
+                        #quantize gradient here
+                        if self.args.grad_bits is None or self.args.grad_bits==0:
+                            #no quantization
+                            averaged_params[k] = (local_model_params[k]-previous_global_model_params[k]) * w + previous_global_model_params[k]
+                        else: 
+                            averaged_params[k] = self.quantize_grad(local_model_params[k]-previous_global_model_params[k], self.args.grad_bits) * w + previous_global_model_params[k]
+                    else:
+                        if self.args.grad_bits is None or self.args.grad_bits==0:
+                            #no quantization
+                            averaged_params[k] += (local_model_params[k]-previous_global_model_params[k]) * w  
+                        else:
+                            averaged_params[k] += self.quantize_grad(local_model_params[k]-previous_global_model_params[k], self.args.grad_bits) * w  
+            else:
+                for i in range(0, len(model_list)):
+                    local_sample_number, local_model_params = model_list[i]
+                    w = local_sample_number / training_num
+                    if i == 0:
+                        averaged_params[k] = local_model_params[k] * w
+                    else:
+                        averaged_params[k] += local_model_params[k] * w
 
         # update the global model which is cached at the server side
         self.model.load_state_dict(averaged_params)
