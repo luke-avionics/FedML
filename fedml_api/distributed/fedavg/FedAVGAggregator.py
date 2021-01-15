@@ -55,12 +55,16 @@ class FedAVGAggregator(object):
     def quantize_grad(self, grad,bits):
         """quantize the tensor grad in s level on the absolute value coef wise"""
         norm=torch.norm(grad)
-        s=torch.floor(2**(bits-1)/(torch.max(grad)/norm))
+        #s=torch.floor(2**(bits-1)/(torch.max(grad)/norm))
+        s=2.0**bits
         level_float = s * torch.abs(grad) / norm
         previous_level = torch.floor(level_float)
         is_next_level = torch.rand(*grad.shape) < (level_float - previous_level)
         new_level = previous_level + is_next_level
-        return torch.sign(grad) * norm * new_level / s
+        if bits == 1:
+            return torch.sign(grad) * norm / s 
+        else:
+            return torch.sign(grad) * norm * new_level / s
 
     def aggregate(self,previous_global_model_params):
         start_time = time.time()
@@ -77,14 +81,14 @@ class FedAVGAggregator(object):
 
         # logging.info("################aggregate: %d" % len(model_list))
         (num0, averaged_params) = model_list[0]
-        for k in averaged_params.keys():
-            for i in range(0, len(model_list)):
-                local_sample_number, local_model_params = model_list[i]
-                w = local_sample_number / training_num
-                if i == 0:
-                    averaged_params[k] = local_model_params[k] * w
-                else:
-                    averaged_params[k] += local_model_params[k] * w
+        # for k in averaged_params.keys():
+        #     for i in range(0, len(model_list)):
+        #         local_sample_number, local_model_params = model_list[i]
+        #         w = local_sample_number / training_num
+        #         if i == 0:
+        #             averaged_params[k] = local_model_params[k] * w
+        #         else:
+        #             averaged_params[k] += local_model_params[k] * w
         for k in averaged_params.keys():
             if  ('running_var' not in k) and ('running_mean' not in k) and ('num_batches_tracked' not in k):
                 for i in range(0, len(model_list)):
