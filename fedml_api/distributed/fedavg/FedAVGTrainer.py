@@ -116,7 +116,7 @@ class FedAVGTrainer(object):
         # transform Tensor to list
         if self.args.is_mobile == 1:
             weights = transform_tensor_to_list(weights)
-        return weights, self.local_sample_number
+        return weights, self.local_sample_number, num_bits
 
     def cyclic_adjust_precision(self, _iters, cyclic_period, fixed_sch=True,print_bits=True):
         if self.args.cyclic_num_bits_schedule[0]==self.args.cyclic_num_bits_schedule[1]:

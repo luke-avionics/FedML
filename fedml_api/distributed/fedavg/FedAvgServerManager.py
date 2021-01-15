@@ -34,6 +34,7 @@ class FedAVGServerManager(ServerManager):
         sender_id = msg_params.get(MyMessage.MSG_ARG_KEY_SENDER)
         model_params = msg_params.get(MyMessage.MSG_ARG_KEY_MODEL_PARAMS)
         local_sample_number = msg_params.get(MyMessage.MSG_ARG_KEY_NUM_SAMPLES)
+        num_bits = msg_params.get(MyMessage.MSG_ARG_KEY_NUM_BITS)
         try:
             for received_pack in model_params.keys():
                 tmp_traffic=1
@@ -42,7 +43,7 @@ class FedAVGServerManager(ServerManager):
                 if len(self.args.cyclic_num_bits_schedule)==0:
                     self.traffic_count+=tmp_traffic
                 else:
-                    self.traffic_count+=int(tmp_traffic/(32/self.args.cyclic_num_bits_schedule[0]))
+                    self.traffic_count+=int(tmp_traffic/(32/num_bits))
             logging.info("Traffic consummed: "+str(self.traffic_count))
             #wandb.log({"Traffic consummed": self.traffic_count, "mini_round": self.round_idx},commit=False)
         except Exception as e:
