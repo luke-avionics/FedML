@@ -116,11 +116,18 @@ class FedAVGTrainer(object):
         # transform Tensor to list
         if self.args.is_mobile == 1:
             weights = transform_tensor_to_list(weights)
+        latent_weight=copy.deepcopy(weights)
         if num_bits != 0:
-            weight_qparams = calculate_qparams(weights, num_bits=num_bits, flatten_dims=(1, -1),
-                                            reduce_dim=None)
-            weights = quantize(weights, qparams=weight_qparams)
-        return weights, self.local_sample_number, num_bits
+           for k in weights.keys():
+               #if 'bias' in k:
+               #    logging.info(str(k))
+               if 'weight' in k and 'bn' not in k:
+                   weight_qparams = calculate_qparams(copy.deepcopy(weights[k]), num_bits=num_bits, flatten_dims=(1, -1),
+                                                   reduce_dim=None)
+                   weights[k] = quantize(copy.deepcopy(weights[k]), qparams=weight_qparams)
+               elif 'bias' in k and 'bn' not in k:
+                   weights[k] = quantize(copy.deepcopy(weights[k]), num_bits=num_bits,flatten_dims=(0, -1))
+        return weights, self.local_sample_number, num_bits, latent_weight
 
     def cyclic_adjust_precision(self, _iters, cyclic_period, fixed_sch=True,print_bits=True):
         if self.args.cyclic_num_bits_schedule[0]==self.args.cyclic_num_bits_schedule[1]:

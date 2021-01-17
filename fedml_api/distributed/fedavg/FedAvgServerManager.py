@@ -35,6 +35,7 @@ class FedAVGServerManager(ServerManager):
         model_params = msg_params.get(MyMessage.MSG_ARG_KEY_MODEL_PARAMS)
         local_sample_number = msg_params.get(MyMessage.MSG_ARG_KEY_NUM_SAMPLES)
         num_bits = msg_params.get(MyMessage.MSG_ARG_KEY_NUM_BITS)
+        latent_weight = msg_params.get(MyMessage.MSG_ARG_KEY_LATENT_WEIGHT)
         try:
             for received_pack in model_params.keys():
                 tmp_traffic=1
@@ -49,10 +50,11 @@ class FedAVGServerManager(ServerManager):
         except Exception as e:
             logging.info(str(e))
         self.aggregator.add_local_trained_result(sender_id - 1, model_params, local_sample_number)
+        self.aggregator.add_local_trained_result_latent(sender_id - 1, latent_weight)
         b_all_received = self.aggregator.check_whether_all_receive()
         logging.info("b_all_received = " + str(b_all_received))
         if b_all_received:
-            global_model_params = self.aggregator.aggregate()
+            global_model_params, global_model_params_latent = self.aggregator.aggregate()
             try:
                 self.aggregator.test_on_all_clients(self.round_idx,self.traffic_count,self.client_indexes)
             except Exception as e:
@@ -73,10 +75,12 @@ class FedAVGServerManager(ServerManager):
 
             for receiver_id in range(1, self.size):
                 #self.send_message_sync_model_to_client(receiver_id, self.aggregator.model_dict[receiver_id-1], self.client_indexes[receiver_id-1])
-                if num_bits != 0:
-                    weight_qparams = calculate_qparams(global_model_params, num_bits=num_bits, flatten_dims=(1, -1),
-                                                    reduce_dim=None)
-                    global_model_params = quantize(global_model_params, qparams=weight_qparams)
+                # if num_bits != 0:
+                #     for k in global_model_params.keys():
+                #         if 'weight' in k and 'bn' not in k:
+                #             weight_qparams = calculate_qparams(global_model_params[k], num_bits=num_bits, flatten_dims=(1, -1),
+                #                                             reduce_dim=None)
+                #             global_model_params[k] = quantize(global_model_params[k], qparams=weight_qparams)
                 self.send_message_sync_model_to_client(receiver_id, global_model_params, self.client_indexes[receiver_id-1])
     def send_message_init_config(self, receive_id, global_model_params, client_index):
         message = Message(MyMessage.MSG_TYPE_S2C_INIT_CONFIG, self.get_sender_id(), receive_id)

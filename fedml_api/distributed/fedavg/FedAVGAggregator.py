@@ -26,6 +26,7 @@ class FedAVGAggregator(object):
         self.device = device
         self.args = args
         self.model_dict = dict()
+        self.model_dict_latent = dict()
         self.sample_num_dict = dict()
         self.flag_client_model_uploaded_dict = dict()
         for idx in range(self.worker_num):
@@ -45,6 +46,9 @@ class FedAVGAggregator(object):
         self.model_dict[index] = model_params
         self.sample_num_dict[index] = sample_num
         self.flag_client_model_uploaded_dict[index] = True
+
+    def add_local_trained_result_latent(self, index, model_params):
+        self.model_dict_latent[index] = model_params
 
     def check_whether_all_receive(self):
         for idx in range(self.worker_num):
@@ -69,21 +73,23 @@ class FedAVGAggregator(object):
 
         # logging.info("################aggregate: %d" % len(model_list))
         (num0, averaged_params) = model_list[0]
+        averaged_params_latent = copy.deepcopy(averaged_params)
         for k in averaged_params.keys():
             for i in range(0, len(model_list)):
                 local_sample_number, local_model_params = model_list[i]
                 w = local_sample_number / training_num
                 if i == 0:
                     averaged_params[k] = local_model_params[k] * w
+                    averaged_params_latent[k] = copy.deepcopy(self.model_dict_latent[i][k] * w)
                 else:
                     averaged_params[k] += local_model_params[k] * w
-
+                    averaged_params_latent[k] += copy.deepcopy(self.model_dict_latent[i][k] * w)
         # update the global model which is cached at the server side
-        self.model.load_state_dict(averaged_params)
+        self.model.load_state_dict(averaged_params_latent)
 
         end_time = time.time()
         logging.info("aggregate time cost: %d" % (end_time - start_time))
-        return averaged_params
+        return averaged_params, averaged_params_latent
 
     def client_sampling(self, round_idx, client_num_in_total, client_num_per_round):
         if client_num_in_total == client_num_per_round:
