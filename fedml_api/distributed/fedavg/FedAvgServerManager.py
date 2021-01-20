@@ -1,13 +1,15 @@
 import logging
+import copy
 
 from fedml_api.distributed.fedavg.message_define import MyMessage
 from fedml_api.distributed.fedavg.utils import transform_tensor_to_list
 from fedml_core.distributed.communication.message import Message
 from fedml_core.distributed.server.server_manager import ServerManager
 from fedml_api.model.cv.quantize import calculate_qparams, quantize
+from fedml_api.distributed.fedavg.FedAVGTrainer import ServerTrainer
 
 class FedAVGServerManager(ServerManager):
-    def __init__(self, args, aggregator, comm=None, rank=0, size=0, backend="MPI"):
+    def __init__(self, args, aggregator, comm=None, rank=0, size=0, backend="MPI", device='cuda:0', use_fake_data=True):
         super().__init__(args, comm, rank, size, backend)
         self.args = args
         self.aggregator = aggregator
@@ -15,6 +17,15 @@ class FedAVGServerManager(ServerManager):
         self.round_idx = 0
         self.traffic_count=0
         self.client_indexes=[]
+
+        self.device = device
+        self.use_fake_data = use_fake_data
+
+        if use_fake_data:
+            self.server_trainer = ServerTrainer(device=device) # currently model is fixed
+        else:
+            self.server_trainer = None
+
     def run(self):
         super().run()
 
@@ -34,16 +45,14 @@ class FedAVGServerManager(ServerManager):
         sender_id = msg_params.get(MyMessage.MSG_ARG_KEY_SENDER)
         model_params = msg_params.get(MyMessage.MSG_ARG_KEY_MODEL_PARAMS)
         local_sample_number = msg_params.get(MyMessage.MSG_ARG_KEY_NUM_SAMPLES)
-        num_bits = msg_params.get(MyMessage.MSG_ARG_KEY_NUM_BITS)
+
         try:
             for received_pack in model_params.keys():
                 tmp_traffic=1
                 for tmp_dim in model_params[received_pack].shape:
                     tmp_traffic*=tmp_dim
-                if len(self.args.cyclic_num_bits_schedule)==0:
-                    self.traffic_count+=tmp_traffic
-                else:
-                    self.traffic_count+=int(tmp_traffic/(32/num_bits))
+                    self.traffic_count+=int(tmp_traffic)
+
             logging.info("Traffic consummed: "+str(self.traffic_count))
             #wandb.log({"Traffic consummed": self.traffic_count, "mini_round": self.round_idx},commit=False)
         except Exception as e:
@@ -51,6 +60,7 @@ class FedAVGServerManager(ServerManager):
         self.aggregator.add_local_trained_result(sender_id - 1, model_params, local_sample_number)
         b_all_received = self.aggregator.check_whether_all_receive()
         logging.info("b_all_received = " + str(b_all_received))
+
         if b_all_received:
             global_model_params = self.aggregator.aggregate()
             try:
@@ -71,22 +81,33 @@ class FedAVGServerManager(ServerManager):
             #     print("transform_tensor_to_list")
             #     global_model_params = transform_tensor_to_list(global_model_params)
 
+            if self.round_idx <= 1 or self.use_fake_data == False:
+                shared_data = None
+            else:
+                shared_data = self.shared_data
+
             for receiver_id in range(1, self.size):
                 #self.send_message_sync_model_to_client(receiver_id, self.aggregator.model_dict[receiver_id-1], self.client_indexes[receiver_id-1])
-                if num_bits != 0:
-                    weight_qparams = calculate_qparams(global_model_params, num_bits=num_bits, flatten_dims=(1, -1),
-                                                    reduce_dim=None)
-                    global_model_params = quantize(global_model_params, qparams=weight_qparams)
-                self.send_message_sync_model_to_client(receiver_id, global_model_params, self.client_indexes[receiver_id-1])
+                self.send_message_sync_model_to_client(receiver_id, global_model_params, self.client_indexes[receiver_id-1], shared_data)
+
+            if self.use_fake_data and self.server_trainer is not None:
+                self.shared_data = self.server_trainer.generate_fake_data(copy.deepcopy(global_model_params))
+
+
+
     def send_message_init_config(self, receive_id, global_model_params, client_index):
         message = Message(MyMessage.MSG_TYPE_S2C_INIT_CONFIG, self.get_sender_id(), receive_id)
         message.add_params(MyMessage.MSG_ARG_KEY_MODEL_PARAMS, global_model_params)
         message.add_params(MyMessage.MSG_ARG_KEY_CLIENT_INDEX, str(client_index))
         self.send_message(message)
 
-    def send_message_sync_model_to_client(self, receive_id, global_model_params, client_index):
+
+    def send_message_sync_model_to_client(self, receive_id, global_model_params, client_index, shared_data=None):
         logging.info("send_message_sync_model_to_client. receive_id = %d" % receive_id)
         message = Message(MyMessage.MSG_TYPE_S2C_SYNC_MODEL_TO_CLIENT, self.get_sender_id(), receive_id)
         message.add_params(MyMessage.MSG_ARG_KEY_MODEL_PARAMS, global_model_params)
         message.add_params(MyMessage.MSG_ARG_KEY_CLIENT_INDEX, str(client_index))
+
+        message.add_params(MyMessage.MSG_ARG_KEY_SHARE_DATA, shared_data)
+
         self.send_message(message)

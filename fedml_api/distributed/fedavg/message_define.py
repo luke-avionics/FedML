@@ -22,3 +22,5 @@ class MyMessage(object):
     MSG_ARG_KEY_CLIENT_INDEX = "client_idx"
     MSG_ARG_KEY_NUM_BITS = "num_bits"
 
+    MSG_ARG_KEY_SHARE_DATA = "share_data"
+

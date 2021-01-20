@@ -38,3 +38,4 @@ mpirun -np $PROCESS_NUM -hostfile ./mpi_host_file python3 ./main_fedavg.py \
   --inference_bits ${INFERENCE_BITS} \
   --cyclic_num_bits_schedule ${CYCLIC_NUM_BITS_SCHEDULE} \
   --lr_decay_step_size ${LR_DECAY_STEP_SIZE}
+  --use_fake_data

@@ -14,24 +14,24 @@ def FedML_init():
 
 
 def FedML_FedAvg_distributed(process_id, worker_number, device, comm, model, train_data_num, train_data_global, test_data_global,
-                 train_data_local_num_dict, train_data_local_dict, test_data_local_dict, args):
+                 train_data_local_num_dict, train_data_local_dict, test_data_local_dict, args, use_fake_data=False):
     if process_id == 0:
         init_server(args, device, comm, process_id, worker_number, model, train_data_num, train_data_global,
-                    test_data_global, train_data_local_dict, test_data_local_dict, train_data_local_num_dict)
+                    test_data_global, train_data_local_dict, test_data_local_dict, train_data_local_num_dict, use_fake_data=use_fake_data)
     else:
         init_client(args, device, comm, process_id, worker_number, model, train_data_num, train_data_local_num_dict,
                     train_data_local_dict)
 
 
 def init_server(args, device, comm, rank, size, model, train_data_num, train_data_global, test_data_global,
-                train_data_local_dict, test_data_local_dict, train_data_local_num_dict):
+                train_data_local_dict, test_data_local_dict, train_data_local_num_dict, use_fake_data=False):
     # aggregator
     worker_num = size - 1
     aggregator = FedAVGAggregator(train_data_global, test_data_global, train_data_num,
                                   train_data_local_dict, test_data_local_dict, train_data_local_num_dict, worker_num, device, model, args)
 
     # start the distributed training
-    server_manager = FedAVGServerManager(args, aggregator, comm, rank, size)
+    server_manager = FedAVGServerManager(args, aggregator, comm, rank, size, device=device, use_fake_data=use_fake_data)
     server_manager.send_init_msg()
     server_manager.run()
 

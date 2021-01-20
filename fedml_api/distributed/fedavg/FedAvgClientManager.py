@@ -31,6 +31,7 @@ class FedAVGClientManager(ClientManager):
 
         self.trainer.update_model(global_model_params)
         self.trainer.update_dataset(int(client_index))
+
         self.round_idx = 0
         self.__train()
 
@@ -43,24 +44,26 @@ class FedAVGClientManager(ClientManager):
         model_params = msg_params.get(MyMessage.MSG_ARG_KEY_MODEL_PARAMS)
         client_index = msg_params.get(MyMessage.MSG_ARG_KEY_CLIENT_INDEX)
 
+        share_data = msg_params.get(MyMessage.MSG_ARG_KEY_SHARE_DATA)
+
         if self.args.is_mobile == 1:
             model_params = transform_list_to_tensor(model_params)
 
         self.trainer.update_model(model_params)
-        self.trainer.update_dataset(int(client_index))
+        self.trainer.update_dataset(int(client_index), share_data)   # add a function to deal with shared data
         self.round_idx += 1
         self.__train()
         if self.round_idx == self.num_rounds - 1:
             self.finish()
 
-    def send_model_to_server(self, receive_id, weights, local_sample_num, num_bits):
+    def send_model_to_server(self, receive_id, weights, local_sample_num):
         message = Message(MyMessage.MSG_TYPE_C2S_SEND_MODEL_TO_SERVER, self.get_sender_id(), receive_id)
         message.add_params(MyMessage.MSG_ARG_KEY_MODEL_PARAMS, weights)
         message.add_params(MyMessage.MSG_ARG_KEY_NUM_SAMPLES, local_sample_num)
-        message.add_params(MyMessage.MSG_ARG_KEY_NUM_BITS, num_bits)
+
         self.send_message(message)
 
     def __train(self):
         logging.info("#######training########### round_id = %d" % self.round_idx)
-        weights, local_sample_num, num_bits = self.trainer.train()
-        self.send_model_to_server(0, weights, local_sample_num, num_bits)
+        weights, local_sample_num = self.trainer.train()
+        self.send_model_to_server(0, weights, local_sample_num)

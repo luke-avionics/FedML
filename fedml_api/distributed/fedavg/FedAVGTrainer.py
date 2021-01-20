@@ -2,9 +2,11 @@ import logging
 
 import torch
 from torch import nn
+import numpy as np
 
 from fedml_api.distributed.fedavg.utils import transform_tensor_to_list
 from fedml_api.model.cv.quantize import calculate_qparams, quantize
+from fedml_api.model.cv.resnet import resnet20
 
 class FedAVGTrainer(object):
     def __init__(self, client_index, train_data_local_dict, train_data_local_num_dict, train_data_num, device, model,
@@ -40,10 +42,24 @@ class FedAVGTrainer(object):
         # logging.info("update_model. client_index = %d" % self.client_index)
         self.model.load_state_dict(weights)
 
-    def update_dataset(self, client_index):
+    def update_dataset(self, client_index, shared_data):
         self.client_index = client_index
         self.train_local = self.train_data_local_dict[client_index]
         self.local_sample_number = self.train_data_local_num_dict[client_index]
+
+        if shared_data is not None:
+            for item in shared_data:
+                item[0] = torch.tensor(item[0])
+
+            self.shared_data = shared_data  # a list with size batch_num: [(batch_size, channel_num, height, weight), label]
+
+        self.total_batch_num = len(self.train_local) + len(shared_data)
+
+        # assume num of local data is larger than shared data
+        share_location = np.random.choice(self.total_batch_num, len(shared_data))
+
+        self.indicator_use_share_data = np.zeros(self.total_batch_num)
+        self.indicator_use_share_data[share_location] = 1
 
     def train(self):
         #logging.info('Before training starts..............')
@@ -51,38 +67,33 @@ class FedAVGTrainer(object):
         # change to train mode
         self.model.train()
         #logging.info('model init done !!!!!!!!!!!!!')
+
+        shared_data_idx = 0
+
         epoch_loss = []
         for epoch in range(self.args.epochs):
             batch_loss = []
             try:
-                for batch_idx, (x, labels) in enumerate(self.train_local):
+                for batch_idx in range(self.total_batch_num):
                     
                     #logging.info('Beginning of training on one batch !!!!!!!!!!!!!!!!!!!!!!!!!!')
-
-                    _iters = self.glb_epoch * len(self.train_local) + batch_idx
-                    cyclic_period = int((self.args.comm_round * len(self.train_local)) // self.cyclic_period)
-
-                    if (self.args.cyclic_num_bits_schedule[0]==0 or self.args.cyclic_num_bits_schedule[1]==0) :
-                        num_bits = 0
-                    #elif self.glb_epoch>=self.args.comm_round-3:
-                    #    num_bits = 8
-                    elif self.glb_epoch>=self.args.comm_round-6:
-                        self.args.cyclic_num_bits_schedule=[4,8]
-                        cyclic_period = int((self.args.comm_round * len(self.train_local)) // 32)
-                        offset=self.offset_finder(self.args.cyclic_num_bits_schedule[1],cyclic_period,len(self.train_local),self.lr_steps)
-                        offseted_iters=min(max(0,_iters-offset),self.lr_steps)
-                        num_bits = self.cyclic_adjust_precision(offseted_iters, cyclic_period)
-                    else:
-                        num_bits = self.cyclic_adjust_precision(_iters, cyclic_period)
                     #logging.info('Right before data moving starts!!!!!')
                     # logging.info(images.shape)
+
+                    if self.indicator_use_share_data[batch_idx]:
+                        x, labels = self.shared_data[shared_data_idx]
+                        shared_data_idx += 1
+
+                    else:
+                        x, labels = self.train_local.next()
+
                     x, labels = x.to(self.device), labels.to(self.device)
                     self.optimizer.zero_grad()
                     # if epoch < 10 and  self.first_run:
                     #     log_probs = self.model(x, num_bits=0)
                     # else:
                     #logging.info('Right before training started !!!!!!!!!!!!!!!!!')
-                    log_probs = self.model(x, num_bits=num_bits)
+                    log_probs = self.model(x, num_bits=0)
                     loss = self.criterion(log_probs, labels)
                     loss.backward()
                     g_norm=nn.utils.clip_grad_norm_(self.model.parameters(),0.9,'inf')
@@ -116,11 +127,8 @@ class FedAVGTrainer(object):
         # transform Tensor to list
         if self.args.is_mobile == 1:
             weights = transform_tensor_to_list(weights)
-        if num_bits != 0:
-            weight_qparams = calculate_qparams(weights, num_bits=num_bits, flatten_dims=(1, -1),
-                                            reduce_dim=None)
-            weights = quantize(weights, qparams=weight_qparams)
-        return weights, self.local_sample_number, num_bits
+
+        return weights, self.local_sample_number
 
     def cyclic_adjust_precision(self, _iters, cyclic_period, fixed_sch=True,print_bits=True):
         if self.args.cyclic_num_bits_schedule[0]==self.args.cyclic_num_bits_schedule[1]:
@@ -161,3 +169,42 @@ class FedAVGTrainer(object):
                 offset=j
                 break
         return offset
+
+
+
+
+
+class ServerTrainer(object):
+    def __init__(self, device):
+        self.device = device
+
+        self.model = resnet20(class_num=100).to(self.device)
+
+        self.lr = 0.02
+        self.lr_steps = 1000
+
+        self.criterion = nn.CrossEntropyLoss().to(self.device)
+        # self.optimizer = torch.optim.SGD(self.model.parameters(), momentum=0.9, lr=self.lr, weight_decay=1e-4)
+
+        self.optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.model.parameters()), lr=self.lr)
+
+        self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[self.lr_steps / 2, self.lr_steps * 3 / 4], gamma=0.1)
+
+
+    def update_model(self, weights):
+        # logging.info("update_model. client_index = %d" % self.client_index)
+        self.model.load_state_dict(weights)
+
+
+    def generate_fake_data(self, global_model_params):
+        #logging.info('Before training starts..............')
+        self.model.to(self.device)
+        # change to train mode
+        self.update_model(global_model_params)
+        self.model.train()
+        #logging.info('model init done !!!!!!!!!!!!!')
+
+        # generate fake data
+        shared_data = np.ones(8, 3, 32, 32)
+
+        return shared_data

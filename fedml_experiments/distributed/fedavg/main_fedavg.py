@@ -102,6 +102,10 @@ def add_args(parser):
                         help='lr decay step size')   
     parser.add_argument('--ci', type=int, default=0,
                         help='CI')
+
+    parser.add_argument('--use_fake_data', action='store_true',
+                        help='whether to use fake data in FedAVG')
+
     args = parser.parse_args()
     return args
 
@@ -301,4 +305,4 @@ if __name__ == "__main__":
     # start "federated averaging (FedAvg)"
     FedML_FedAvg_distributed(process_id, worker_number, device, comm,
                              model, train_data_num, train_data_global, test_data_global,
-                             train_data_local_num_dict, train_data_local_dict, test_data_local_dict, args)
+                             train_data_local_num_dict, train_data_local_dict, test_data_local_dict, args, use_fake_data=args.use_fake_data)
