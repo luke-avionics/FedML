@@ -18,6 +18,9 @@ class FedAVGTrainer(object):
         self.train_local = self.train_data_local_dict[client_index]
         self.local_sample_number = self.train_data_local_num_dict[client_index]
 
+        self.indicator_use_share_data = None
+        self.total_batch_num = len(self.train_local)
+
         self.device = device
         self.args = args
         self.model = model
@@ -42,24 +45,30 @@ class FedAVGTrainer(object):
         # logging.info("update_model. client_index = %d" % self.client_index)
         self.model.load_state_dict(weights)
 
-    def update_dataset(self, client_index, shared_data):
+    def update_dataset(self, client_index, shared_data=None):
         self.client_index = client_index
         self.train_local = self.train_data_local_dict[client_index]
         self.local_sample_number = self.train_data_local_num_dict[client_index]
 
         if shared_data is not None:
             for item in shared_data:
-                item[0] = torch.tensor(item[0])
+                item[0] = torch.tensor(item[0], dtype=torch.float)
+                item[1] = torch.tensor(item[1], dtype=torch.long)
 
             self.shared_data = shared_data  # a list with size batch_num: [(batch_size, channel_num, height, weight), label]
+            # logging.info("+++++++++++shared data: " + str(shared_data))
+            self.total_batch_num = len(self.train_local) + len(shared_data)
 
-        self.total_batch_num = len(self.train_local) + len(shared_data)
+            share_location = np.random.choice(self.total_batch_num, len(shared_data))
 
-        # assume num of local data is larger than shared data
-        share_location = np.random.choice(self.total_batch_num, len(shared_data))
-
-        self.indicator_use_share_data = np.zeros(self.total_batch_num)
-        self.indicator_use_share_data[share_location] = 1
+            self.indicator_use_share_data = np.zeros(self.total_batch_num)
+            self.indicator_use_share_data[share_location] = 1
+            logging.info('Using fake data')
+            #logging.info('fake data indicator:' + str(self.indicator_use_share_data))
+        else:
+            self.total_batch_num = len(self.train_local)
+            self.indicator_use_share_data = None
+        
 
     def train(self):
         #logging.info('Before training starts..............')
@@ -73,19 +82,18 @@ class FedAVGTrainer(object):
         epoch_loss = []
         for epoch in range(self.args.epochs):
             batch_loss = []
-            try:
-                for batch_idx in range(self.total_batch_num):
-                    
+            # try:
+            for batch_idx in range(self.total_batch_num):
+                try:    
                     #logging.info('Beginning of training on one batch !!!!!!!!!!!!!!!!!!!!!!!!!!')
                     #logging.info('Right before data moving starts!!!!!')
                     # logging.info(images.shape)
 
-                    if self.indicator_use_share_data[batch_idx]:
+                    if self.indicator_use_share_data is not None and self.indicator_use_share_data[batch_idx]:
                         x, labels = self.shared_data[shared_data_idx]
                         shared_data_idx += 1
-
                     else:
-                        x, labels = self.train_local.next()
+                        x, labels = next(iter(self.train_local))
 
                     x, labels = x.to(self.device), labels.to(self.device)
                     self.optimizer.zero_grad()
@@ -104,22 +112,23 @@ class FedAVGTrainer(object):
                     self.scheduler.step()
 
                     #logging.info('End of training on one batch !!!!!!!!!!!!!!!!!!!!!!!!!!')
-
-                self.glb_epoch+=1
-                if len(batch_loss) > 0:
-                    epoch_loss.append(sum(batch_loss) / len(batch_loss))
-                    logging.info('(client {}. Local Training Epoch: {} \tLoss: {:.6f}'.format(self.client_index,
-                                                                    epoch, sum(epoch_loss) / len(epoch_loss)))
-            except Exception as e:
-                logging.info(str(e))
+                except Exception as e:
+                    logging.warning(str(e))
+            self.glb_epoch+=1
+            if len(batch_loss) > 0:
+                epoch_loss.append(sum(batch_loss) / len(batch_loss))
+                logging.info('(client {}. Local Training Epoch: {} \tLoss: {:.6f}'.format(self.client_index,
+                                                                epoch, sum(epoch_loss) / len(epoch_loss)))
+            # except Exception as e:
+            #     logging.info(str(e))
         # if self.comm_round < (self.args.lr_decay_step_size+1):
         #     self.scheduler.step()
         self.comm_round+=1
         for g in self.optimizer.param_groups:
-            logging.info("===current learning rate===: "+str(g['lr']))
+            #logging.info("===current learning rate===: "+str(g['lr']))
             break
-        logging.info("========= number of batches =======: "+str(batch_idx+1))
-        logging.info("========= Transmitted bits ========: "+str(num_bits))
+        #logging.info("========= number of batches =======: "+str(batch_idx+1))
+        # logging.info("========= Transmitted bits ========: "+str(num_bits))
         self.first_run=False
 
         weights = self.model.cpu().state_dict()
@@ -147,9 +156,9 @@ class FedAVGTrainer(object):
         else:
             slope = - float(num_bit_max - num_bit_min)/down_period
             num_bits = round(slope * (current_iter-up_period)) + num_bit_max
-        if print_bits:
-            if _iters % 50 == 0:
-                logging.info('num_bits = {} '.format(num_bits))
+        #if print_bits:
+            #if _iters % 50 == 0:
+                #logging.info('num_bits = {} '.format(num_bits))
 
         return num_bits
 
@@ -197,14 +206,14 @@ class ServerTrainer(object):
 
 
     def generate_fake_data(self, global_model_params):
-        #logging.info('Before training starts..............')
-        self.model.to(self.device)
+        logging.info('Generating fake data..............')
+        # self.model.to(self.device)
         # change to train mode
-        self.update_model(global_model_params)
-        self.model.train()
+        # self.update_model(global_model_params) # Error(s) in loading state_dict for ResNet unexpected key(s)
+        # self.model.train()
         #logging.info('model init done !!!!!!!!!!!!!')
 
         # generate fake data
-        shared_data = np.ones(8, 3, 32, 32)
+        shared_data = [[np.ones((8, 3, 32, 32)), np.ones((8))] for _ in range(32)]
 
         return shared_data

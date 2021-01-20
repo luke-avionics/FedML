@@ -1,18 +1,16 @@
 #!/usr/bin/env bash
 
-CLIENT_NUM=4
-WORKER_NUM=4
+CLIENT_NUM=2
+WORKER_NUM=2
 SERVER_NUM=1
-GPU_NUM_PER_SERVER=4
+GPU_NUM_PER_SERVER=3
 MODEL='resnet38'
 DISTRIBUTION='homo'
 ROUND=160
 EPOCH=1
 BATCH_SIZE=32
 LR='0.1'
-INFERENCE_BITS=8
-schedule=(4 8)
-CYCLIC_NUM_BITS_SCHEDULE=${schedule[@]}
+INFERENCE_BITS=0
 LR_DECAY_STEP_SIZE=2000
 DATASET='cifar100'
 DATA_DIR="/home/yf22/dataset"
@@ -36,6 +34,5 @@ mpirun -np $PROCESS_NUM -hostfile ./mpi_host_file python3 ./main_fedavg.py \
   --batch_size ${BATCH_SIZE} \
   --lr ${LR} \
   --inference_bits ${INFERENCE_BITS} \
-  --cyclic_num_bits_schedule ${CYCLIC_NUM_BITS_SCHEDULE} \
-  --lr_decay_step_size ${LR_DECAY_STEP_SIZE}
+  --lr_decay_step_size ${LR_DECAY_STEP_SIZE} \
   --use_fake_data

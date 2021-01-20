@@ -53,7 +53,7 @@ class FedAVGServerManager(ServerManager):
                     tmp_traffic*=tmp_dim
                     self.traffic_count+=int(tmp_traffic)
 
-            logging.info("Traffic consummed: "+str(self.traffic_count))
+            # logging.info("Traffic consummed: "+str(self.traffic_count))
             #wandb.log({"Traffic consummed": self.traffic_count, "mini_round": self.round_idx},commit=False)
         except Exception as e:
             logging.info(str(e))
@@ -89,10 +89,12 @@ class FedAVGServerManager(ServerManager):
             for receiver_id in range(1, self.size):
                 #self.send_message_sync_model_to_client(receiver_id, self.aggregator.model_dict[receiver_id-1], self.client_indexes[receiver_id-1])
                 self.send_message_sync_model_to_client(receiver_id, global_model_params, self.client_indexes[receiver_id-1], shared_data)
-
+            # logging.info("++++++++++++++reaching here")
+            # logging.info(str(self.use_fake_data))
+            # logging.info(str(self.server_trainer))
             if self.use_fake_data and self.server_trainer is not None:
                 self.shared_data = self.server_trainer.generate_fake_data(copy.deepcopy(global_model_params))
-
+            logging.info('Finished generating fake data..............')
 
 
     def send_message_init_config(self, receive_id, global_model_params, client_index):

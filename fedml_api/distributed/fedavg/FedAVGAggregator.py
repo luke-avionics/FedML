@@ -65,7 +65,7 @@ class FedAVGAggregator(object):
             model_list.append((self.sample_num_dict[idx], self.model_dict[idx]))
             training_num += self.sample_num_dict[idx]
 
-        logging.info("len of self.model_dict[idx] = " + str(len(self.model_dict)))
+        # logging.info("len of self.model_dict[idx] = " + str(len(self.model_dict)))
 
         # logging.info("################aggregate: %d" % len(model_list))
         (num0, averaged_params) = model_list[0]
