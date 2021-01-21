@@ -214,18 +214,22 @@ class ServerTrainer(object):
 
         # self.model.to(self.device)
         # change to train mode
-        # self.update_model(global_model_params) # Error(s) in loading state_dict for ResNet unexpected key(s)
+        self.update_model(global_model_params) # Error(s) in loading state_dict for ResNet unexpected key(s)
         # self.model.train()
         #logging.info('model init done !!!!!!!!!!!!!')
 
-        teacher =     # teacher network/global model
+        teacher = self.model # teacher network/global model
 
         epochs = 50
         iters = 500
+        batch_size = 256
+        latent_dim = 512
+        alpha = 0.01
+
 
         generator = Generator().cuda()
         optimizer_G = torch.optim.Adam(generator.parameters(), lr=1e-3,betas=(0.5,0.999))
-        scheduler_G = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer_G, T_max=global_model_params.n_epochs, eta_min=0)
+        scheduler_G = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer_G, T_max=200, eta_min=0)
 
         loss_r_feature_layers = []
 
@@ -233,9 +237,9 @@ class ServerTrainer(object):
             if isinstance(module, nn.BatchNorm2d):
                 loss_r_feature_layers.append(hook_for_BNLoss(module))
 
-        for epoch in range():
+        for epoch in range(epochs):
         	for i in range(iters):
-        		z = torch.randn(global_model_params.batch_size, global_model_params.latent_dim).cuda()
+        		z = torch.randn(batch_size., latent_dim).cuda()
         		optimizer_G.zero_grad()
 
         		gen_imgs = generator(z)
@@ -251,7 +255,7 @@ class ServerTrainer(object):
                 for mod in loss_r_feature_layers:
                     l_bn += mod.G_kd_loss.sum()  
 
-                l_s = global_model_params.alpha * (l_ie + l_oh + l_bn)
+                l_s = alpha * (l_ie + l_oh + l_bn)
 
                 l_s.backward()
                 optimizer_G.step()
@@ -262,7 +266,7 @@ class ServerTrainer(object):
             
             scheduler_G.step()
 
-        z = torch.randn(global_model_params.batch_size, global_model_params.latent_dim).cuda()
+        z = torch.randn(batch_size, latent_dim).cuda()
         shared_data = generator(z)
 
         # generate fake data
