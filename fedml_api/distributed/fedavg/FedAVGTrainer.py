@@ -58,7 +58,7 @@ class FedAVGTrainer(object):
                 item[0] = torch.tensor(item[0], dtype=torch.float)
                 item[1] = torch.tensor(item[1], dtype=torch.long)
 
-            self.shared_data = shared_data  # a list with size batch_num: [(batch_size, channel_num, height, weight), label]
+            self.shared_data = shared_data  # a list with size batch_num: [((batch_size, channel_num, height, weight), label)]
             # logging.info("+++++++++++shared data: " + str(shared_data))
             self.total_batch_num = len(self.train_local) + len(shared_data)
 
@@ -190,15 +190,19 @@ class ServerTrainer(object):
     def __init__(self, device):
         self.device = device
 
-        self.model = resnet20(class_num=100).to(self.device)
+        self.batch_num = 50
+
+        self.model = resnet20(class_num=10).to(self.device)
+
+        self.generator = Generator().to(self.device)
 
         self.lr = 0.02
         self.lr_steps = 1000
 
         self.criterion = nn.CrossEntropyLoss().to(self.device)
-        # self.optimizer = torch.optim.SGD(self.model.parameters(), momentum=0.9, lr=self.lr, weight_decay=1e-4)
+        # self.optimizer_G = torch.optim.SGD(self.model.parameters(), momentum=0.9, lr=self.lr, weight_decay=1e-4)
 
-        self.optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.model.parameters()), lr=self.lr)
+        self.optimizer_G = torch.optim.Adam(generator.parameters(), lr=1e-3,betas=(0.5,0.999))
 
         self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[self.lr_steps / 2, self.lr_steps * 3 / 4], gamma=0.1)
 
@@ -209,7 +213,7 @@ class ServerTrainer(object):
 
 
     def generate_fake_data(self, global_model_params):
-        logging.info('Generating fake data..............')
+        logging.info('Central Server: Generating fake data..............')
 
 
         # self.model.to(self.device)
@@ -218,7 +222,7 @@ class ServerTrainer(object):
         # self.model.train()
         #logging.info('model init done !!!!!!!!!!!!!')
 
-        teacher = self.model # teacher network/global model
+        self.model.eval() # teacher network/global model
 
         epochs = 50
         iters = 500
@@ -226,25 +230,22 @@ class ServerTrainer(object):
         latent_dim = 512
         alpha = 0.01
 
-
-        generator = Generator().cuda()
-        optimizer_G = torch.optim.Adam(generator.parameters(), lr=1e-3,betas=(0.5,0.999))
-        scheduler_G = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer_G, T_max=200, eta_min=0)
+        scheduler_G = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer_G, T_max=200, eta_min=0)
 
         loss_r_feature_layers = []
 
-        for module in teacher.modules():
+        for module in self.model.modules():
             if isinstance(module, nn.BatchNorm2d):
                 loss_r_feature_layers.append(hook_for_BNLoss(module))
 
         for epoch in range(epochs):
         	for i in range(iters):
-        		z = torch.randn(batch_size., latent_dim).cuda()
-        		optimizer_G.zero_grad()
+        		z = torch.randn(batch_size, latent_dim).cuda()
+        		self.optimizer_G.zero_grad()
 
-        		gen_imgs = generator(z)
+        		gen_imgs = self.generator(z)
 
-        		o_T = teacher(gen_imgs)
+        		o_T = self.model(gen_imgs)
         		so_T = torch.nn.functional.softmax(o_T, dim = 1)
                 so_T_mean=so_T.mean(dim = 0)
 
@@ -258,18 +259,29 @@ class ServerTrainer(object):
                 l_s = alpha * (l_ie + l_oh + l_bn)
 
                 l_s.backward()
-                optimizer_G.step()
+                self.optimizer_G.step()
 
-                if i == 1:
-                    print("[Epoch %d/%d]  [loss_oh: %f] [loss_ie: %f] [loss_BN: %f] " \
-                % (epoch, epochs,l_oh.item(), l_ie.item(), l_bn.item()))
+
+            logging.info("Central Server: Fake Data Generation [Epoch %d/%d]  [loss_oh: %f] [loss_ie: %f] [loss_BN: %f] ",
+                        epoch, epochs, l_oh.item(), l_ie.item(), l_bn.item())
             
             scheduler_G.step()
 
-        z = torch.randn(batch_size, latent_dim).cuda()
-        shared_data = generator(z)
+        gen_imgs_list = []
+        labels_list = []
+        for batch_id in range(self.batch_num):
+            z = torch.randn(32, latent_dim).cuda()
+            gen_imgs = self.generator(z)
+
+            logits = self.model(gen_imgs)
+            labels = logits.argmax(-1)
+
+            gen_imgs_list.append(gen_imgs)
+            labels_list.append(labels)
+
+        shared_data = zip(gen_imgs_list, labels_list) 
 
         # generate fake data
         #shared_data = [[np.ones((8, 3, 32, 32)), np.ones((8))] for _ in range(32)]
 
-        return shared_data
+        return shared_data   # a list with size batch_num: [((batch_size, channel_num, height, weight), label)]
