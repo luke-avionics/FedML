@@ -8,6 +8,9 @@ from fedml_api.distributed.fedavg.utils import transform_tensor_to_list
 from fedml_api.model.cv.quantize import calculate_qparams, quantize
 from fedml_api.model.cv.resnet import resnet20
 
+from generator import Generator
+from utils import hook_for_BNLoss
+
 class FedAVGTrainer(object):
     def __init__(self, client_index, train_data_local_dict, train_data_local_num_dict, train_data_num, device, model,
                  args):
@@ -207,13 +210,62 @@ class ServerTrainer(object):
 
     def generate_fake_data(self, global_model_params):
         logging.info('Generating fake data..............')
+
+
         # self.model.to(self.device)
         # change to train mode
         # self.update_model(global_model_params) # Error(s) in loading state_dict for ResNet unexpected key(s)
         # self.model.train()
         #logging.info('model init done !!!!!!!!!!!!!')
 
+        teacher =     # teacher network/global model
+
+        epochs = 50
+        iters = 500
+
+        generator = Generator().cuda()
+        optimizer_G = torch.optim.Adam(generator.parameters(), lr=1e-3,betas=(0.5,0.999))
+        scheduler_G = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer_G, T_max=global_model_params.n_epochs, eta_min=0)
+
+        loss_r_feature_layers = []
+
+        for module in teacher.modules():
+            if isinstance(module, nn.BatchNorm2d):
+                loss_r_feature_layers.append(hook_for_BNLoss(module))
+
+        for epoch in range():
+        	for i in range(iters):
+        		z = torch.randn(global_model_params.batch_size, global_model_params.latent_dim).cuda()
+        		optimizer_G.zero_grad()
+
+        		gen_imgs = generator(z)
+
+        		o_T = teacher(gen_imgs)
+        		so_T = torch.nn.functional.softmax(o_T, dim = 1)
+                so_T_mean=so_T.mean(dim = 0)
+
+                l_ie = (so_T_mean * torch.log(so_T_mean)).sum() #IE loss
+                l_oh= - (so_T * torch.log(so_T)).sum(dim=1).mean() #one-hot entropy
+                l_bn = 0 #BN loss
+
+                for mod in loss_r_feature_layers:
+                    l_bn += mod.G_kd_loss.sum()  
+
+                l_s = global_model_params.alpha * (l_ie + l_oh + l_bn)
+
+                l_s.backward()
+                optimizer_G.step()
+
+                if i == 1:
+                    print("[Epoch %d/%d]  [loss_oh: %f] [loss_ie: %f] [loss_BN: %f] " \
+                % (epoch, epochs,l_oh.item(), l_ie.item(), l_bn.item()))
+            
+            scheduler_G.step()
+
+        z = torch.randn(global_model_params.batch_size, global_model_params.latent_dim).cuda()
+        shared_data = generator(z)
+
         # generate fake data
-        shared_data = [[np.ones((8, 3, 32, 32)), np.ones((8))] for _ in range(32)]
+        #shared_data = [[np.ones((8, 3, 32, 32)), np.ones((8))] for _ in range(32)]
 
         return shared_data
