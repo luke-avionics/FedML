@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+import logging
 
 
 def transform_list_to_tensor(model_params_list):

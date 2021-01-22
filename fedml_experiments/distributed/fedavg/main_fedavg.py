@@ -265,8 +265,8 @@ if __name__ == "__main__":
     if process_id == 0:
         wandb.init(
             # project="federated_nas",
-            project="cpt_test_12-17_1e-4_multi_client",
-            name="single_Sync_PFQ_4bit_eval_8bit-FedAVG(d)"+str(args.model)+str(args.dataset)+str(args.batch_size)+str(args.cyclic_num_bits_schedule)+ "-infer"+str(args.inference_bits)+"-"+str(args.partition_method) + "r" + str(args.comm_round) + "-e" + str(
+            project="fake_data",
+            name="fake_data_"+str(args.model)+str(args.dataset)+str(args.batch_size)+str(args.cyclic_num_bits_schedule)+ "-infer"+str(args.inference_bits)+"-"+str(args.partition_method) + "r" + str(args.comm_round) + "-e" + str(
                 args.epochs) + "-lr" + str(
                 args.lr),
             config=args

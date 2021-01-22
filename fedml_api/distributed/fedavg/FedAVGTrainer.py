@@ -3,6 +3,7 @@ import logging
 import torch
 from torch import nn
 import numpy as np
+from torchvision.utils import save_image
 
 from fedml_api.distributed.fedavg.utils import transform_tensor_to_list, hook_for_BNLoss
 from fedml_api.model.cv.quantize import calculate_qparams, quantize
@@ -53,9 +54,9 @@ class FedAVGTrainer(object):
         self.local_sample_number = self.train_data_local_num_dict[client_index]
 
         if shared_data is not None:
-            for item in shared_data:
-                item[0] = torch.tensor(item[0], dtype=torch.float)
-                item[1] = torch.tensor(item[1], dtype=torch.long)
+            # for item in shared_data:
+            #     item[0] = torch.tensor(item[0], dtype=torch.float)
+            #     item[1] = torch.tensor(item[1], dtype=torch.long)
 
             self.shared_data = shared_data  # a list with size batch_num: [((batch_size, channel_num, height, weight), label)]
             # logging.info("+++++++++++shared data: " + str(shared_data))
@@ -191,7 +192,7 @@ class ServerTrainer(object):
 
         self.batch_num = 50
 
-        self.epochs = 50
+        self.epochs = 20
         self.iters = 500
         self.batch_size = 256
         self.latent_dim = 512
@@ -211,6 +212,7 @@ class ServerTrainer(object):
 
         # self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[self.lr_steps / 2, self.lr_steps * 3 / 4], gamma=0.1)
 
+        self.invoke_idx = 0
 
     def update_model(self, weights):
         # logging.info("update_model. client_index = %d" % self.client_index)
@@ -220,7 +222,7 @@ class ServerTrainer(object):
     def generate_fake_data(self, global_model_params):
         logging.info('Central Server: Generating fake data..............')
 
-
+        
         # self.model.to(self.device)
         # change to train mode
         self.update_model(global_model_params) # Error(s) in loading state_dict for ResNet unexpected key(s)
@@ -228,7 +230,7 @@ class ServerTrainer(object):
         #logging.info('model init done !!!!!!!!!!!!!')
 
         self.model.eval() # teacher network/global model
-
+        self.generator.train()
 
 
         scheduler_G = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer_G, T_max=200, eta_min=0)
@@ -280,9 +282,15 @@ class ServerTrainer(object):
             gen_imgs_list.append(gen_imgs)
             labels_list.append(labels)
 
-        shared_data = zip(gen_imgs_list, labels_list) 
+        shared_data = list(zip(gen_imgs_list, labels_list)) 
+
+        # Save first 10 images in the first batch
+        for i in range(10):
+            save_image(shared_data[0][0][i], './sample_imgs/run0/iter{}_image{}_label{}.png'.format(self.invoke_idx, i, shared_data[0][1][i]))
 
         # generate fake data
         #shared_data = [[np.ones((8, 3, 32, 32)), np.ones((8))] for _ in range(32)]
+
+        self.invoke_idx += 1
 
         return shared_data   # a list with size batch_num: [((batch_size, channel_num, height, weight), label)]

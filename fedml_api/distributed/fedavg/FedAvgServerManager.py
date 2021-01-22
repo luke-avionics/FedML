@@ -94,7 +94,7 @@ class FedAVGServerManager(ServerManager):
             # logging.info(str(self.server_trainer))
             if self.use_fake_data and self.server_trainer is not None:
                 self.shared_data = self.server_trainer.generate_fake_data(copy.deepcopy(global_model_params))
-            logging.info('Finished generating fake data..............')
+                logging.info('Finished generating fake data..............')
 
 
     def send_message_init_config(self, receive_id, global_model_params, client_index):
