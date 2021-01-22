@@ -4,12 +4,11 @@ import torch
 from torch import nn
 import numpy as np
 
-from fedml_api.distributed.fedavg.utils import transform_tensor_to_list
+from fedml_api.distributed.fedavg.utils import transform_tensor_to_list, hook_for_BNLoss
 from fedml_api.model.cv.quantize import calculate_qparams, quantize
 from fedml_api.model.cv.resnet import resnet20
 
-from generator import Generator
-from utils import hook_for_BNLoss
+from fedml_api.distributed.fedavg.generator import Generator
 
 class FedAVGTrainer(object):
     def __init__(self, client_index, train_data_local_dict, train_data_local_num_dict, train_data_num, device, model,
@@ -192,9 +191,15 @@ class ServerTrainer(object):
 
         self.batch_num = 50
 
+        self.epochs = 50
+        self.iters = 500
+        self.batch_size = 256
+        self.latent_dim = 512
+        self.alpha = 0.01
+
         self.model = resnet20(class_num=10).to(self.device)
 
-        self.generator = Generator().to(self.device)
+        self.generator = Generator(latent_dim=self.latent_dim, img_size=32).to(self.device)
 
         self.lr = 0.02
         self.lr_steps = 1000
@@ -202,9 +207,9 @@ class ServerTrainer(object):
         self.criterion = nn.CrossEntropyLoss().to(self.device)
         # self.optimizer_G = torch.optim.SGD(self.model.parameters(), momentum=0.9, lr=self.lr, weight_decay=1e-4)
 
-        self.optimizer_G = torch.optim.Adam(generator.parameters(), lr=1e-3,betas=(0.5,0.999))
+        self.optimizer_G = torch.optim.Adam(self.generator.parameters(), lr=1e-3,betas=(0.5,0.999))
 
-        self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[self.lr_steps / 2, self.lr_steps * 3 / 4], gamma=0.1)
+        # self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[self.lr_steps / 2, self.lr_steps * 3 / 4], gamma=0.1)
 
 
     def update_model(self, weights):
@@ -224,11 +229,7 @@ class ServerTrainer(object):
 
         self.model.eval() # teacher network/global model
 
-        epochs = 50
-        iters = 500
-        batch_size = 256
-        latent_dim = 512
-        alpha = 0.01
+
 
         scheduler_G = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer_G, T_max=200, eta_min=0)
 
@@ -238,15 +239,15 @@ class ServerTrainer(object):
             if isinstance(module, nn.BatchNorm2d):
                 loss_r_feature_layers.append(hook_for_BNLoss(module))
 
-        for epoch in range(epochs):
-        	for i in range(iters):
-        		z = torch.randn(batch_size, latent_dim).cuda()
-        		self.optimizer_G.zero_grad()
+        for epoch in range(self.epochs):
+            for i in range(self.iters):
+                z = torch.randn(self.batch_size, self.latent_dim).cuda()
+                self.optimizer_G.zero_grad()
 
-        		gen_imgs = self.generator(z)
+                gen_imgs = self.generator(z)
 
-        		o_T = self.model(gen_imgs)
-        		so_T = torch.nn.functional.softmax(o_T, dim = 1)
+                o_T = self.model(gen_imgs)
+                so_T = torch.nn.functional.softmax(o_T, dim = 1)
                 so_T_mean=so_T.mean(dim = 0)
 
                 l_ie = (so_T_mean * torch.log(so_T_mean)).sum() #IE loss
@@ -256,21 +257,21 @@ class ServerTrainer(object):
                 for mod in loss_r_feature_layers:
                     l_bn += mod.G_kd_loss.sum()  
 
-                l_s = alpha * (l_ie + l_oh + l_bn)
+                l_s = self.alpha * (l_ie + l_oh + l_bn)
 
                 l_s.backward()
                 self.optimizer_G.step()
 
 
             logging.info("Central Server: Fake Data Generation [Epoch %d/%d]  [loss_oh: %f] [loss_ie: %f] [loss_BN: %f] ",
-                        epoch, epochs, l_oh.item(), l_ie.item(), l_bn.item())
+                        epoch, self.epochs, l_oh.item(), l_ie.item(), l_bn.item())
             
             scheduler_G.step()
 
         gen_imgs_list = []
         labels_list = []
         for batch_id in range(self.batch_num):
-            z = torch.randn(32, latent_dim).cuda()
+            z = torch.randn(32, self.latent_dim).cuda()
             gen_imgs = self.generator(z)
 
             logits = self.model(gen_imgs)

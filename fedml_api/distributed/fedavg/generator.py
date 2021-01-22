@@ -2,12 +2,13 @@ import torch.nn as nn
 import torch
 
 class Generator(nn.Module):
-    def __init__(self,opt):
-        self.opt=opt
-        nz=self.opt.latent_dim
+    def __init__(self, latent_dim, img_size):
+        # self.opt=opt
+        # nz=self.opt.latent_dim
+        nz = latent_dim
         ngf=64
         nc=3
-        img_size=self.opt.img_size
+        # img_size=self.opt.img_size
         super(Generator, self).__init__()
 
         self.init_size = img_size//8
