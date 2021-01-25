@@ -1,5 +1,6 @@
 import logging
 import copy
+import time
 
 from fedml_api.distributed.fedavg.message_define import MyMessage
 from fedml_api.distributed.fedavg.utils import transform_tensor_to_list
@@ -89,9 +90,14 @@ class FedAVGServerManager(ServerManager):
             for receiver_id in range(1, self.size):
                 #self.send_message_sync_model_to_client(receiver_id, self.aggregator.model_dict[receiver_id-1], self.client_indexes[receiver_id-1])
                 self.send_message_sync_model_to_client(receiver_id, global_model_params, self.client_indexes[receiver_id-1], shared_data)
+                # time.sleep(20)
             # logging.info("++++++++++++++reaching here")
             # logging.info(str(self.use_fake_data))
             # logging.info(str(self.server_trainer))
+            self.shared_data = None
+
+            # if self.round_idx == 2:
+            #     exit(1)
             if self.use_fake_data and self.server_trainer is not None:
                 self.shared_data = self.server_trainer.generate_fake_data(copy.deepcopy(global_model_params))
                 logging.info('Finished generating fake data..............')

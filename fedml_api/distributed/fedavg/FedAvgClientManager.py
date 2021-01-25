@@ -51,6 +51,8 @@ class FedAVGClientManager(ClientManager):
 
         self.trainer.update_model(model_params)
         self.trainer.update_dataset(int(client_index), share_data)   # add a function to deal with shared data
+        del share_data
+        
         self.round_idx += 1
         self.__train()
         if self.round_idx == self.num_rounds - 1:

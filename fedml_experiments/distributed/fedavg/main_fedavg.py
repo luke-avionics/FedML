@@ -228,7 +228,7 @@ def init_training_device(process_ID, fl_worker_num, gpu_num_per_machine):
         return device
     process_gpu_dict = dict()
     for client_index in range(fl_worker_num):
-        gpu_index = client_index % gpu_num_per_machine
+        gpu_index = (client_index + 1) % gpu_num_per_machine
         process_gpu_dict[client_index] = gpu_index
 
     logging.info(process_gpu_dict)

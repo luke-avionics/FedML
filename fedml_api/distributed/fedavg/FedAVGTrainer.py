@@ -54,11 +54,12 @@ class FedAVGTrainer(object):
         self.local_sample_number = self.train_data_local_num_dict[client_index]
 
         if shared_data is not None:
-            # for item in shared_data:
-            #     item[0] = torch.tensor(item[0], dtype=torch.float)
-            #     item[1] = torch.tensor(item[1], dtype=torch.long)
+            for item in shared_data:
+                item = [item[0].to(self.device), item[1].to(self.device)]
 
             self.shared_data = shared_data  # a list with size batch_num: [((batch_size, channel_num, height, weight), label)]
+
+            
             # logging.info("+++++++++++shared data: " + str(shared_data))
             self.total_batch_num = len(self.train_local) + len(shared_data)
 
@@ -80,11 +81,10 @@ class FedAVGTrainer(object):
         self.model.train()
         #logging.info('model init done !!!!!!!!!!!!!')
 
-        shared_data_idx = 0
-
         epoch_loss = []
         for epoch in range(self.args.epochs):
             batch_loss = []
+            shared_data_idx = 0
             # try:
             for batch_idx in range(self.total_batch_num):
                 try:    
@@ -194,11 +194,11 @@ class ServerTrainer(object):
 
         self.epochs = 20
         self.iters = 500
-        self.batch_size = 256
+        self.batch_size = 32
         self.latent_dim = 512
         self.alpha = 0.01
 
-        self.model = resnet20(class_num=10).to(self.device)
+        self.model = resnet20(class_num=100).to(self.device)
 
         self.generator = Generator(latent_dim=self.latent_dim, img_size=32).to(self.device)
 
@@ -273,24 +273,24 @@ class ServerTrainer(object):
         gen_imgs_list = []
         labels_list = []
         for batch_id in range(self.batch_num):
-            z = torch.randn(32, self.latent_dim).cuda()
+            z = torch.randn(self.batch_size, self.latent_dim).cuda()
             gen_imgs = self.generator(z)
 
             logits = self.model(gen_imgs)
             labels = logits.argmax(-1)
 
-            gen_imgs_list.append(gen_imgs)
-            labels_list.append(labels)
+            gen_imgs_list.append(gen_imgs.to('cpu'))
+            labels_list.append(labels.to('cpu'))
 
         shared_data = list(zip(gen_imgs_list, labels_list)) 
 
         # Save first 10 images in the first batch
         for i in range(10):
-            save_image(shared_data[0][0][i], './sample_imgs/run0/iter{}_image{}_label{}.png'.format(self.invoke_idx, i, shared_data[0][1][i]))
+            save_image(shared_data[0][0][i], './sample_imgs/run2_13client_cifar100/iter{}_image{}_label{}.png'.format(self.invoke_idx, i, shared_data[0][1][i]))
 
         # generate fake data
         #shared_data = [[np.ones((8, 3, 32, 32)), np.ones((8))] for _ in range(32)]
-
+        # logging.info("{}".format(shared_data[0]))
         self.invoke_idx += 1
 
         return shared_data   # a list with size batch_num: [((batch_size, channel_num, height, weight), label)]
