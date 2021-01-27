@@ -1,5 +1,5 @@
 import logging
-
+import math
 import torch
 from torch import nn
 import numpy as np
@@ -273,13 +273,36 @@ class ServerTrainer(object):
         gen_imgs_list = []
         labels_list = []
         for batch_id in range(self.batch_num):
-            z = torch.randn(self.batch_size, self.latent_dim).cuda()
-            gen_imgs = self.generator(z)
+            z = torch.randn(self.batch_size*5, self.latent_dim).cuda()
+            gen_imgs = self.generator(z)  #cuda
 
-            logits = self.model(gen_imgs)
-            labels = logits.argmax(-1)
-
-            gen_imgs_list.append(gen_imgs.to('cpu'))
+            logits = self.model(gen_imgs)   #cuda
+            labels = logits.argmax(-1)   #cuda
+            
+            #print(labels)
+            class_num = len(torch.unique(labels))
+            data_per_class = round(self.batch_size /class_num)    # number of fake data needed to choose for each class
+            
+            #print(class_num)
+            #logging.info('(number of classes: {} '.format(class_num))
+            #index_list = []
+            final_gen_imgs = torch.empty([0, gen_imgs.size()[-3], gen_imgs.size()[-2], gen_imgs.size()[-1]]).cuda()
+            final_labels = torch.empty([0]).cuda()
+            
+            for class_id in torch.unique(labels):
+                index = (labels==class_id).nonzero().squeeze()
+                final_labels = torch.cat((final_labels, class_id*torch.ones(data_per_class).cuda() ))
+                if len(index) >= data_per_class:
+                    temp = gen_imgs[index]   
+                    final_gen_imgs = torch.cat((final_gen_imgs, temp[:data_per_class]))
+                    
+                else: 
+                    temp = gen_imgs[index]  
+                    temp = temp.repeat(math.ceil(data_per_class/len(index)), 1, 1, 1)
+                    final_gen_imgs = torch.cat((final_gen_imgs, temp[:data_per_class]))     
+                         
+                
+            gen_imgs_list.append(final_gen_imgs.to('cpu'))
             labels_list.append(labels.to('cpu'))
 
         shared_data = list(zip(gen_imgs_list, labels_list)) 
