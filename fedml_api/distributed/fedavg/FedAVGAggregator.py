@@ -9,37 +9,6 @@ from torch import nn
 
 from fedml_api.distributed.fedavg.utils import transform_list_to_tensor
 
-class QsgdQuantizer(Quantizer):
-
-    def __init__(self, config):
-        self.quantlevel = config.quantization_level 
-        self.quantbound = config.quantization_level - 1
-        self.debug_mode = config.debug_mode
-
-    def quantize(self, arr):
-        norm = arr.norm()
-        abs_arr = arr.abs()
-
-        level_float = abs_arr / norm * self.quantbound 
-        lower_level = level_float.floor()
-        rand_variable = torch.empty_like(arr).uniform_() 
-        is_upper_level = rand_variable < (level_float - lower_level)
-        new_level = (lower_level + is_upper_level)
-        quantized_arr = torch.round(new_level).to(torch.int)
-
-        sign = arr.sign()
-        quantized_set = dict(norm=norm, signs=sign, quantized_arr=quantized_arr)
-
-        if self.debug_mode:
-            quantized_set["original_arr"] = arr.clone()
-
-        return quantized_set
-
-    def dequantize(self, quantized_set):
-        coefficients = quantized_set["norm"]/self.quantbound * quantized_set["signs"]
-        dequant_arr = coefficients * quantized_set["quantized_arr"]
-
-        return dequant_arr
 
 
 

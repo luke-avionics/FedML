@@ -48,6 +48,26 @@ class FedAVGTrainer(object):
         self.train_local = self.train_data_local_dict[client_index]
         self.local_sample_number = self.train_data_local_num_dict[client_index]
 
+    def quantize_grad(self, grad, bits):
+        quantbound=2.0**bits-1
+        norm = grad.norm()
+        abs_arr = grad.abs()
+
+        level_float = abs_arr / norm * quantbound 
+        lower_level = level_float.floor()
+        rand_variable = torch.empty_like(grad).uniform_() 
+        is_upper_level = rand_variable < (level_float - lower_level)
+        new_level = (lower_level + is_upper_level)
+        quantized_arr = torch.round(new_level).to(torch.int)
+        sign = arr.sign()
+        quantized_set = dict(norm=norm, signs=sign, quantized_arr=quantized_arr)
+        return quantized_set
+    def dequantize(self, quantized_set,bits):
+        quantbound=2.0**bits-1
+        coefficients = quantized_set["norm"]/quantbound * quantized_set["signs"]
+        dequant_arr = coefficients * quantized_set["quantized_arr"]
+        return dequant_arr
+        
     def train(self):
         #logging.info('Before training starts..............')
         self.model.to(self.device)
