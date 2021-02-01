@@ -21,4 +21,6 @@ class MyMessage(object):
     MSG_ARG_KEY_MODEL_PARAMS = "model_params"
     MSG_ARG_KEY_CLIENT_INDEX = "client_idx"
     MSG_ARG_KEY_NUM_BITS = "num_bits"
+    MSG_ARG_KEY_LR = "local_lr"
+    MSG_ARG_KEY_AVERAGED_GRAD = "averaged_grad"
 

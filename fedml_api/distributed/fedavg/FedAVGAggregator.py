@@ -9,6 +9,40 @@ from torch import nn
 
 from fedml_api.distributed.fedavg.utils import transform_list_to_tensor
 
+class QsgdQuantizer(Quantizer):
+
+    def __init__(self, config):
+        self.quantlevel = config.quantization_level 
+        self.quantbound = config.quantization_level - 1
+        self.debug_mode = config.debug_mode
+
+    def quantize(self, arr):
+        norm = arr.norm()
+        abs_arr = arr.abs()
+
+        level_float = abs_arr / norm * self.quantbound 
+        lower_level = level_float.floor()
+        rand_variable = torch.empty_like(arr).uniform_() 
+        is_upper_level = rand_variable < (level_float - lower_level)
+        new_level = (lower_level + is_upper_level)
+        quantized_arr = torch.round(new_level).to(torch.int)
+
+        sign = arr.sign()
+        quantized_set = dict(norm=norm, signs=sign, quantized_arr=quantized_arr)
+
+        if self.debug_mode:
+            quantized_set["original_arr"] = arr.clone()
+
+        return quantized_set
+
+    def dequantize(self, quantized_set):
+        coefficients = quantized_set["norm"]/self.quantbound * quantized_set["signs"]
+        dequant_arr = coefficients * quantized_set["quantized_arr"]
+
+        return dequant_arr
+
+
+
 
 class FedAVGAggregator(object):
     def __init__(self, train_global, test_global, all_train_data_num,
@@ -24,6 +58,7 @@ class FedAVGAggregator(object):
         self.worker_num = worker_num
         self.device = device
         self.args = args
+        self.local_lr = self.args.lr
         self.model_dict = dict()
         self.sample_num_dict = dict()
         self.flag_client_model_uploaded_dict = dict()
@@ -52,19 +87,39 @@ class FedAVGAggregator(object):
         for idx in range(self.worker_num):
             self.flag_client_model_uploaded_dict[idx] = False
         return True
-    def quantize_grad(self, grad,bits):
-        """quantize the tensor grad in s level on the absolute value coef wise"""
-        norm=torch.norm(grad)
-        #s=torch.floor(2**(bits-1)/(torch.max(grad)/norm))
-        s=2.0**bits
-        level_float = s * torch.abs(grad) / norm
-        previous_level = torch.floor(level_float)
-        is_next_level = torch.rand(*grad.shape) < (level_float - previous_level)
-        new_level = previous_level + is_next_level
-        if bits == 1:
-            return torch.sign(grad) * norm / s 
-        else:
-            return torch.sign(grad) * norm * new_level / s
+
+    def quantize_grad(self, grad, bits):
+        quantbound=2.0**bits-1
+        norm = grad.norm()
+        abs_arr = grad.abs()
+
+        level_float = abs_arr / norm * quantbound 
+        lower_level = level_float.floor()
+        rand_variable = torch.empty_like(grad).uniform_() 
+        is_upper_level = rand_variable < (level_float - lower_level)
+        new_level = (lower_level + is_upper_level)
+        quantized_arr = torch.round(new_level).to(torch.int)
+        sign = arr.sign()
+        quantized_set = dict(norm=norm, signs=sign, quantized_arr=quantized_arr)
+        return quantized_set
+    def dequantize(self, quantized_set,bits):
+        quantbound=2.0**bits-1
+        coefficients = quantized_set["norm"]/quantbound * quantized_set["signs"]
+        dequant_arr = coefficients * quantized_set["quantized_arr"]
+        return dequant_arr
+    # def quantize_grad(self, grad,bits):
+    #     """quantize the tensor grad in s level on the absolute value coef wise"""
+    #     norm=torch.norm(grad)
+    #     #s=torch.floor(2**(bits-1)/(torch.max(grad)/norm))
+    #     s=2.0**bits
+    #     level_float = s * torch.abs(grad) / norm
+    #     previous_level = torch.floor(level_float)
+    #     is_next_level = torch.rand(*grad.shape) < (level_float - previous_level)
+    #     new_level = previous_level + is_next_level
+    #     if bits == 1:
+    #         return torch.sign(grad) * norm / s 
+    #     else:
+    #         return torch.sign(grad) * norm * new_level / s
 
     def aggregate(self,previous_global_model_params):
         start_time = time.time()
@@ -89,8 +144,10 @@ class FedAVGAggregator(object):
         #             averaged_params[k] = local_model_params[k] * w
         #         else:
         #             averaged_params[k] += local_model_params[k] * w
+        averaged_grad=dict()
         for k in averaged_params.keys():
             if  ('running_var' not in k) and ('running_mean' not in k) and ('num_batches_tracked' not in k):
+                local_dequantized_grad=[]
                 for i in range(0, len(model_list)):
                     local_sample_number, local_model_params = model_list[i]
                     w = local_sample_number / training_num
@@ -99,14 +156,47 @@ class FedAVGAggregator(object):
                         if self.args.grad_bits is None or self.args.grad_bits==0:
                             #no quantization
                             averaged_params[k] = (local_model_params[k]-previous_global_model_params[k]) * w + previous_global_model_params[k]
-                        else: 
-                            averaged_params[k] = self.quantize_grad(local_model_params[k]-previous_global_model_params[k], self.args.grad_bits) * w + previous_global_model_params[k]
+                        else:
+                            quantized_grad_tmp = self.quantize_grad((local_model_params[k]-previous_global_model_params[k])/self.local_lr, self.args.grad_bits) 
+                            local_dequantized_grad.append(self.dequantize(quantized_grad_tmp,self.args.grad_bits))
+                            #averaged_params[k] = self.quantize_grad(local_model_params[k]-previous_global_model_params[k], self.args.grad_bits) * w + previous_global_model_params[k]
                     else:
                         if self.args.grad_bits is None or self.args.grad_bits==0:
                             #no quantization
                             averaged_params[k] += (local_model_params[k]-previous_global_model_params[k]) * w  
                         else:
-                            averaged_params[k] += self.quantize_grad(local_model_params[k]-previous_global_model_params[k], self.args.grad_bits) * w  
+                            quantized_grad_tmp = self.quantize_grad((local_model_params[k]-previous_global_model_params[k])/self.local_lr, self.args.grad_bits)                            
+                            local_dequantized_grad.append(self.dequantize(quantized_grad_tmp,self.args.grad_bits))
+                            #averaged_params[k] += self.quantize_grad(local_model_params[k]-previous_global_model_params[k], self.args.grad_bits) * w  
+                
+                #calculate the aggregated grad and new_global params
+                if self.args.grad_bits is None or self.args.grad_bits==0:
+                    pass
+                else:
+                    for c_idx, dequantized_grad in enumerate(local_dequantized_grad):
+                        #NOTE: we improve them in terms of aggregation 
+                        local_sample_number, local_model_params = model_list[c_idx]
+                        w = local_sample_number / training_num
+                        if c_idx == 0:
+                            averaged_grad[k] = dequantized_grad * w
+                        else:
+                            averaged_grad[k] += dequantized_grad * w
+                averaged_params[k] = previous_global_model_params[k]+ averaged_grad[k]*self.local_lr
+                
+
+                # #calculate the offset
+                # if self.args.grad_bits is None or self.args.grad_bits==0:
+                #     pass
+                # else:
+                #     for c_idx, dequantized_grad in enumerate(local_dequantized_grad):
+                #         #NOTE: we improve them in terms of aggregation 
+                #         local_sample_number, local_model_params = model_list[c_idx]
+                #         w = local_sample_number / training_num
+                #         if k not in self.local_offset[c_idx].keys():
+                #             self.local_offset[c_idx][k]=(self.quantize_grad((-local_model_params[k]+previous_global_model_params[k])/self.local_lr, self.args.grad_bits) + averaged_grad) / self.local_ite
+                #         else:
+                #             self.local 
+
             else:
                 for i in range(0, len(model_list)):
                     local_sample_number, local_model_params = model_list[i]
@@ -121,7 +211,7 @@ class FedAVGAggregator(object):
 
         end_time = time.time()
         logging.info("aggregate time cost: %d" % (end_time - start_time))
-        return averaged_params
+        return averaged_params, averaged_grad
 
     def client_sampling(self, round_idx, client_num_in_total, client_num_per_round):
         if client_num_in_total == client_num_per_round:

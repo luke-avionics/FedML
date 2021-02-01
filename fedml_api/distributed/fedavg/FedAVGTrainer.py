@@ -19,6 +19,9 @@ class FedAVGTrainer(object):
         self.device = device
         self.args = args
         self.model = model
+        self.local_offset = dict()
+        self.w_residue = dict()
+        self.averaged_grad = None
         self.first_run= True
         self.glb_epoch=0
         # logging.info(self.model)
@@ -50,9 +53,21 @@ class FedAVGTrainer(object):
         self.model.to(self.device)
         # change to train mode
         self.model.train()
+        weights_g = copy.deepcopy(self.model.cpu().state_dict())
+
         #logging.info('model init done !!!!!!!!!!!!!')
         epoch_loss = []
         for epoch in range(self.args.epochs):
+            if self.glb_epoch > 0:
+                if len(self.local_offset) == 0:
+                    for k in weights_g.keys():
+                        if  ('running_var' not in k) and ('running_mean' not in k) and ('num_batches_tracked' not in k):
+                            self.local_offset[k]= (self.dequantize(self.w_residue[k],self.args.grad_bits) - self.averaged_grad[k]) / len(self.train_local) 
+                else:
+                    for k in weights_g.keys():
+                        if  ('running_var' not in k) and ('running_mean' not in k) and ('num_batches_tracked' not in k):
+                            self.local_offset[k]+=(self.dequantize(self.w_residue[k],self.args.grad_bits) - self.averaged_grad[k]) / len(self.train_local)
+
             batch_loss = []
             try:
                 for batch_idx, (x, labels) in enumerate(self.train_local):
@@ -85,6 +100,12 @@ class FedAVGTrainer(object):
                     log_probs = self.model(x, num_bits=num_bits)
                     loss = self.criterion(log_probs, labels)
                     loss.backward()
+                    if self.glb_epoch > 0:
+                        for name, param in self.model.named_parameters():
+                            if param.requires_grad:
+                                if str(name) in self.local_offset.keys():
+                                    if  ('running_var' not in k) and ('running_mean' not in k) and ('num_batches_tracked' not in k):
+                                        param.grad=param.grad-self.local_offset[str(name)]
                     g_norm=nn.utils.clip_grad_norm_(self.model.parameters(),0.9,'inf')
                     #logging.info(str(g_norm))
                     self.optimizer.step()
@@ -105,6 +126,7 @@ class FedAVGTrainer(object):
         #     self.scheduler.step()
         self.comm_round+=1
         for g in self.optimizer.param_groups:
+            current_lr=g['lr']
             logging.info("===current learning rate===: "+str(g['lr']))
             break
         logging.info("========= number of batches =======: "+str(batch_idx+1))
@@ -116,7 +138,10 @@ class FedAVGTrainer(object):
         # transform Tensor to list
         if self.args.is_mobile == 1:
             weights = transform_tensor_to_list(weights)
-        return weights, self.local_sample_number, num_bits
+        for k in weights.keys():
+            if  ('running_var' not in k) and ('running_mean' not in k) and ('num_batches_tracked' not in k):
+                self.w_residue[k] = self.quantize_grad((-weights[k]+weights_g[k])/current_lr, self.args.grad_bits)
+        return weights, self.local_sample_number, num_bits, current_lr
 
     def cyclic_adjust_precision(self, _iters, cyclic_period, fixed_sch=True,print_bits=True):
         if self.args.cyclic_num_bits_schedule[0]==self.args.cyclic_num_bits_schedule[1]:

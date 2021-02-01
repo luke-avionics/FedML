@@ -42,25 +42,28 @@ class FedAVGClientManager(ClientManager):
         logging.info("handle_message_receive_model_from_server.")
         model_params = msg_params.get(MyMessage.MSG_ARG_KEY_MODEL_PARAMS)
         client_index = msg_params.get(MyMessage.MSG_ARG_KEY_CLIENT_INDEX)
+        averaged_grad = msg_params.get(MyMessage.MSG_ARG_KEY_AVERAGED_GRAD)
 
         if self.args.is_mobile == 1:
             model_params = transform_list_to_tensor(model_params)
 
         self.trainer.update_model(model_params)
         self.trainer.update_dataset(int(client_index))
+        self.trainer.averaged_grad = copy.deepcopy(averaged_grad)
         self.round_idx += 1
         self.__train()
         if self.round_idx == self.num_rounds - 1:
             self.finish()
 
-    def send_model_to_server(self, receive_id, weights, local_sample_num, num_bits):
+    def send_model_to_server(self, receive_id, weights, local_sample_num, num_bits, local_lr):
         message = Message(MyMessage.MSG_TYPE_C2S_SEND_MODEL_TO_SERVER, self.get_sender_id(), receive_id)
         message.add_params(MyMessage.MSG_ARG_KEY_MODEL_PARAMS, weights)
         message.add_params(MyMessage.MSG_ARG_KEY_NUM_SAMPLES, local_sample_num)
         message.add_params(MyMessage.MSG_ARG_KEY_NUM_BITS, num_bits)
+        message.add_params(MyMessage.MSG_ARG_KEY_LR, local_lr)
         self.send_message(message)
 
     def __train(self):
         logging.info("#######training########### round_id = %d" % self.round_idx)
-        weights, local_sample_num, num_bits = self.trainer.train()
-        self.send_model_to_server(0, weights, local_sample_num, num_bits)
+        weights, local_sample_num, num_bits, local_lr = self.trainer.train()
+        self.send_model_to_server(0, weights, local_sample_num, num_bits, local_lr)
