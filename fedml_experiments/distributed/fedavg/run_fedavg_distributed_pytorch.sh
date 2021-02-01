@@ -1,21 +1,22 @@
 #!/usr/bin/env bash
 
-CLIENT_NUM=4
-WORKER_NUM=4
+CLIENT_NUM=8
+WORKER_NUM=8
 SERVER_NUM=1
 GPU_NUM_PER_SERVER=4
-MODEL='resnet38'
-DISTRIBUTION='homo'
+MODEL='resnet74'
+DISTRIBUTION='hetero'
 ROUND=160
 EPOCH=1
 BATCH_SIZE=32
 LR='0.1'
-INFERENCE_BITS=8
-schedule=(4 8)
+INFERENCE_BITS=0
+schedule=(0 0)
 CYCLIC_NUM_BITS_SCHEDULE=${schedule[@]}
 LR_DECAY_STEP_SIZE=2000
-DATASET='cifar100'
-DATA_DIR="/home/yf22/dataset"
+DATASET='cinic10'
+#DATA_DIR="/home/yf22/dataset"
+DATA_DIR="./../../../data/cinic10"
 
 PROCESS_NUM=`expr $WORKER_NUM + 1`
 echo $PROCESS_NUM

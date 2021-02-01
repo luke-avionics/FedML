@@ -1,5 +1,5 @@
 import logging
-
+import copy
 import torch
 from torch import nn
 
@@ -19,6 +19,7 @@ class FedAVGTrainer(object):
         self.device = device
         self.args = args
         self.model = model
+        self.quant_residue = dict()
         self.first_run= True
         self.glb_epoch=0
         # logging.info(self.model)
@@ -31,9 +32,11 @@ class FedAVGTrainer(object):
                                               lr=self.args.lr,
                                               weight_decay=self.args.wd, amsgrad=True)
         lr_steps = self.args.comm_round * len(self.train_local)
-        self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[lr_steps / 2, lr_steps * 3 / 4], gamma=0.1)
+        self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[lr_steps / 2, lr_steps * 3 / 4], gamma=0.5)
+        #self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[lr_steps / 2], gamma=0.1)
+        #self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[lr_steps * 3 / 4], gamma=0.5)
         self.comm_round = 0 
-
+        logging.info("=======num_iter====== "+str(lr_steps))
         self.cyclic_period = self.args.comm_round
         self.lr_steps=lr_steps
     def update_model(self, weights):
@@ -46,6 +49,16 @@ class FedAVGTrainer(object):
         self.local_sample_number = self.train_data_local_num_dict[client_index]
 
     def train(self):
+        #apply residue
+        weights = self.model.cpu().state_dict()
+        for k in self.quant_residue.keys():
+            #if 'bias' in k:
+            #    logging.info(str(k))
+            if 'weight' in k and 'bn' not in k:
+                weights[k]=copy.deepcopy(weights[k]+self.quant_residue[k])
+            elif 'bias' in k and 'bn' not in k:
+                weights[k]=copy.deepcopy(weights[k]+self.quant_residue[k])
+        self.update_model(weights)
         #logging.info('Before training starts..............')
         self.model.to(self.device)
         # change to train mode
@@ -60,20 +73,31 @@ class FedAVGTrainer(object):
                     #logging.info('Beginning of training on one batch !!!!!!!!!!!!!!!!!!!!!!!!!!')
 
                     _iters = self.glb_epoch * len(self.train_local) + batch_idx
-                    cyclic_period = int((self.args.comm_round * len(self.train_local)) // self.cyclic_period)
+                    #cyclic_period = int((self.args.comm_round * len(self.train_local)) // self.cyclic_period)
+                    cyclic_period = int((self.args.comm_round * len(self.train_local)) // 32)
+                    #cyclic_period = int((self.args.comm_round * len(self.train_local)) // self.cyclic_period)*2
+                    #if self.glb_epoch % 2 == 0:
+                    #    self.args.cyclic_num_bits_schedule=[8,32]
+                    #else:
+                    #    self.args.cyclic_num_bits_schedule=[4,32]
 
                     if (self.args.cyclic_num_bits_schedule[0]==0 or self.args.cyclic_num_bits_schedule[1]==0) :
                         num_bits = 0
                     #elif self.glb_epoch>=self.args.comm_round-3:
                     #    num_bits = 8
-                    elif self.glb_epoch>=self.args.comm_round-6:
-                        self.args.cyclic_num_bits_schedule=[4,8]
-                        cyclic_period = int((self.args.comm_round * len(self.train_local)) // 32)
+                    #elif self.glb_epoch>=self.args.comm_round-6:
+                    #    #self.args.inference_bits=32
+                    #    #self.args.cyclic_num_bits_schedule=[8,32]
+                    #    cyclic_period = int((self.args.comm_round * len(self.train_local)) // 32)
+                    #    offset=self.offset_finder(self.args.cyclic_num_bits_schedule[1],cyclic_period,len(self.train_local),self.lr_steps)
+                    #    offseted_iters=min(max(0,_iters-offset),self.lr_steps)
+                    #    num_bits = self.cyclic_adjust_precision(offseted_iters, cyclic_period)
+                    else:
                         offset=self.offset_finder(self.args.cyclic_num_bits_schedule[1],cyclic_period,len(self.train_local),self.lr_steps)
                         offseted_iters=min(max(0,_iters-offset),self.lr_steps)
                         num_bits = self.cyclic_adjust_precision(offseted_iters, cyclic_period)
-                    else:
-                        num_bits = self.cyclic_adjust_precision(_iters, cyclic_period)
+                        #if num_bits == 32:
+                        #    num_bits =0
                     #logging.info('Right before data moving starts!!!!!')
                     # logging.info(images.shape)
                     x, labels = x.to(self.device), labels.to(self.device)
@@ -117,16 +141,20 @@ class FedAVGTrainer(object):
         if self.args.is_mobile == 1:
             weights = transform_tensor_to_list(weights)
         latent_weight=copy.deepcopy(weights)
+        logging.info('Quantizing model')
         if num_bits != 0:
-           for k in weights.keys():
-               #if 'bias' in k:
-               #    logging.info(str(k))
-               if 'weight' in k and 'bn' not in k:
-                   weight_qparams = calculate_qparams(copy.deepcopy(weights[k]), num_bits=num_bits, flatten_dims=(1, -1),
-                                                   reduce_dim=None)
-                   weights[k] = quantize(copy.deepcopy(weights[k]), qparams=weight_qparams)
-               elif 'bias' in k and 'bn' not in k:
-                   weights[k] = quantize(copy.deepcopy(weights[k]), num_bits=num_bits,flatten_dims=(0, -1))
+            for k in weights.keys():
+                #if 'bias' in k:
+                #    logging.info(str(k))
+                if 'weight' in k and 'bn' not in k:
+                    weight_qparams = calculate_qparams(copy.deepcopy(weights[k]), num_bits=num_bits, flatten_dims=(1, -1),
+                                                    reduce_dim=None)
+                    weights[k] = quantize(copy.deepcopy(weights[k]), qparams=weight_qparams)
+                    self.quant_residue[k]=copy.deepcopy(latent_weight[k]-weights[k])
+                elif 'bias' in k and 'bn' not in k:
+                    weights[k] = quantize(copy.deepcopy(weights[k]), num_bits=num_bits,flatten_dims=(0, -1))
+                    self.quant_residue[k]=copy.deepcopy(latent_weight[k]-weights[k])
+        logging.info('Sending model')
         return weights, self.local_sample_number, num_bits, latent_weight
 
     def cyclic_adjust_precision(self, _iters, cyclic_period, fixed_sch=True,print_bits=True):

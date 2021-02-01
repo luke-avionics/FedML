@@ -1,5 +1,5 @@
 import logging
-
+import copy
 from fedml_api.distributed.fedavg.message_define import MyMessage
 from fedml_api.distributed.fedavg.utils import transform_tensor_to_list
 from fedml_core.distributed.communication.message import Message
@@ -81,6 +81,16 @@ class FedAVGServerManager(ServerManager):
                 #             weight_qparams = calculate_qparams(global_model_params[k], num_bits=num_bits, flatten_dims=(1, -1),
                 #                                             reduce_dim=None)
                 #             global_model_params[k] = quantize(global_model_params[k], qparams=weight_qparams)
+                if num_bits != 0 and num_bits < 32:
+                    for k in global_model_params.keys():
+                        #if 'bias' in k:
+                        #    logging.info(str(k))
+                        if 'weight' in k and 'bn' not in k:
+                            weight_qparams = calculate_qparams(copy.deepcopy(global_model_params[k]), num_bits=num_bits+1, flatten_dims=(1, -1),
+                                                            reduce_dim=None)
+                            global_model_params[k] = quantize(copy.deepcopy(global_model_params[k]), qparams=weight_qparams)
+                        elif 'bias' in k and 'bn' not in k:
+                            global_model_params[k] = quantize(copy.deepcopy(global_model_params[k]), num_bits=num_bits+1,flatten_dims=(0, -1))
                 self.send_message_sync_model_to_client(receiver_id, global_model_params, self.client_indexes[receiver_id-1])
     def send_message_init_config(self, receive_id, global_model_params, client_index):
         message = Message(MyMessage.MSG_TYPE_S2C_INIT_CONFIG, self.get_sender_id(), receive_id)

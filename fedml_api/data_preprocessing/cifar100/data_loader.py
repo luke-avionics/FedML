@@ -254,7 +254,7 @@ def load_partition_data_cifar100(dataset, data_dir, partition_method, partition_
     logging.info("traindata_cls_counts = " + str(traindata_cls_counts))
     train_data_num = sum([len(net_dataidx_map[r]) for r in range(client_number)])
 
-    train_data_global, test_data_global = get_dataloader(dataset, data_dir, batch_size, batch_size*4)
+    train_data_global, test_data_global = get_dataloader(dataset, data_dir, batch_size, 512)
     logging.info("train_dl_global number = " + str(len(train_data_global)))
     logging.info("test_dl_global number = " + str(len(train_data_global)))
     test_data_num = len(test_data_global)
@@ -271,7 +271,7 @@ def load_partition_data_cifar100(dataset, data_dir, partition_method, partition_
         logging.info("client_idx = %d, local_sample_number = %d" % (client_idx, local_data_num))
 
         # training batch size = 64; algorithms batch size = 32
-        train_data_local, test_data_local = get_dataloader(dataset, data_dir, batch_size, batch_size*4,
+        train_data_local, test_data_local = get_dataloader(dataset, data_dir, batch_size, 512,
                                                  dataidxs)
         logging.info("client_idx = %d, batch_num_train_local = %d, batch_num_test_local = %d" % (
             client_idx, len(train_data_local), len(test_data_local)))
