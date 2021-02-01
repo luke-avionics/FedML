@@ -100,7 +100,7 @@ def add_args(parser):
                         help='cyclic schedule for weight/act precision')
     parser.add_argument('--lr_decay_step_size', default=2000, type=int,  
                         help='lr decay step size')   
-    parser.add_argument('--grad_bits', type=int, default=None,
+    parser.add_argument('--grad_bits', type=int, default=8,
                         help='bit values for the gradients')
     parser.add_argument('--ci', type=int, default=0,
                         help='CI')

@@ -1,6 +1,8 @@
 import logging
-
+import os 
+import sys 
 import torch
+import copy
 from torch import nn
 
 from fedml_api.distributed.fedavg.utils import transform_tensor_to_list
@@ -59,7 +61,7 @@ class FedAVGTrainer(object):
         is_upper_level = rand_variable < (level_float - lower_level)
         new_level = (lower_level + is_upper_level)
         quantized_arr = torch.round(new_level).to(torch.int)
-        sign = arr.sign()
+        sign = grad.sign()
         quantized_set = dict(norm=norm, signs=sign, quantized_arr=quantized_arr)
         return quantized_set
     def dequantize(self, quantized_set,bits):
@@ -69,24 +71,34 @@ class FedAVGTrainer(object):
         return dequant_arr
         
     def train(self):
+        try:
+            weights_g = copy.deepcopy(self.model.cpu().state_dict())
+        except Exception as e:
+            logging.info(str(e))
+
+        
         #logging.info('Before training starts..............')
         self.model.to(self.device)
         # change to train mode
         self.model.train()
-        weights_g = copy.deepcopy(self.model.cpu().state_dict())
-
         #logging.info('model init done !!!!!!!!!!!!!')
         epoch_loss = []
         for epoch in range(self.args.epochs):
-            if self.glb_epoch > 0:
-                if len(self.local_offset) == 0:
-                    for k in weights_g.keys():
-                        if  ('running_var' not in k) and ('running_mean' not in k) and ('num_batches_tracked' not in k):
-                            self.local_offset[k]= (self.dequantize(self.w_residue[k],self.args.grad_bits) - self.averaged_grad[k]) / len(self.train_local) 
-                else:
-                    for k in weights_g.keys():
-                        if  ('running_var' not in k) and ('running_mean' not in k) and ('num_batches_tracked' not in k):
-                            self.local_offset[k]+=(self.dequantize(self.w_residue[k],self.args.grad_bits) - self.averaged_grad[k]) / len(self.train_local)
+            try:
+                if self.glb_epoch > 0:
+                    if len(self.local_offset) == 0:
+                        for k in weights_g.keys():
+                            if  ('running_var' not in k) and ('running_mean' not in k) and ('num_batches_tracked' not in k):
+                                self.local_offset[k]= (self.dequantize(self.w_residue[k],self.args.grad_bits) - self.averaged_grad[k]) / len(self.train_local) 
+                    else:
+                        for k in weights_g.keys():
+                            if  ('running_var' not in k) and ('running_mean' not in k) and ('num_batches_tracked' not in k):
+                                self.local_offset[k]+=(self.dequantize(self.w_residue[k],self.args.grad_bits) - self.averaged_grad[k]) / len(self.train_local)
+            except Exception as e:
+                logging.info(str(e))
+                exc_type, exc_obj, exc_tb = sys.exc_info()
+                fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+                logging.info(str(exc_type) +" "+ str(fname)+" "+str(exc_tb.tb_lineno))
 
             batch_loss = []
             try:
@@ -123,9 +135,9 @@ class FedAVGTrainer(object):
                     if self.glb_epoch > 0:
                         for name, param in self.model.named_parameters():
                             if param.requires_grad:
-                                if str(name) in self.local_offset.keys():
+                                if str(name) in self.local_offset.keys() and param.grad is not None:
                                     if  ('running_var' not in k) and ('running_mean' not in k) and ('num_batches_tracked' not in k):
-                                        param.grad=param.grad-self.local_offset[str(name)]
+                                        param.grad=param.grad-self.local_offset[str(name)].to(self.device)
                     g_norm=nn.utils.clip_grad_norm_(self.model.parameters(),0.9,'inf')
                     #logging.info(str(g_norm))
                     self.optimizer.step()
@@ -142,6 +154,11 @@ class FedAVGTrainer(object):
                                                                     epoch, sum(epoch_loss) / len(epoch_loss)))
             except Exception as e:
                 logging.info(str(e))
+                exc_type, exc_obj, exc_tb = sys.exc_info()
+                fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+                logging.info(str(exc_type) +" "+ str(fname)+" "+str(exc_tb.tb_lineno))
+
+        
         # if self.comm_round < (self.args.lr_decay_step_size+1):
         #     self.scheduler.step()
         self.comm_round+=1
@@ -152,15 +169,20 @@ class FedAVGTrainer(object):
         logging.info("========= number of batches =======: "+str(batch_idx+1))
         logging.info("========= Transmitted bits ========: "+str(num_bits))
         self.first_run=False
+        try:
+            weights = self.model.cpu().state_dict()
 
-        weights = self.model.cpu().state_dict()
-
-        # transform Tensor to list
-        if self.args.is_mobile == 1:
-            weights = transform_tensor_to_list(weights)
-        for k in weights.keys():
-            if  ('running_var' not in k) and ('running_mean' not in k) and ('num_batches_tracked' not in k):
-                self.w_residue[k] = self.quantize_grad((-weights[k]+weights_g[k])/current_lr, self.args.grad_bits)
+            # transform Tensor to list
+            if self.args.is_mobile == 1:
+                weights = transform_tensor_to_list(weights)
+            for k in weights.keys():
+                if  ('running_var' not in k) and ('running_mean' not in k) and ('num_batches_tracked' not in k):
+                    self.w_residue[k] = self.quantize_grad((-weights[k]+weights_g[k])/current_lr, self.args.grad_bits)
+        except Exception as e:
+            logging.info(str(e))
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            logging.info(str(exc_type) +" "+ str(fname)+" "+str(exc_tb.tb_lineno))
         return weights, self.local_sample_number, num_bits, current_lr
 
     def cyclic_adjust_precision(self, _iters, cyclic_period, fixed_sch=True,print_bits=True):

@@ -68,7 +68,7 @@ class FedAVGAggregator(object):
         is_upper_level = rand_variable < (level_float - lower_level)
         new_level = (lower_level + is_upper_level)
         quantized_arr = torch.round(new_level).to(torch.int)
-        sign = arr.sign()
+        sign = grad.sign()
         quantized_set = dict(norm=norm, signs=sign, quantized_arr=quantized_arr)
         return quantized_set
     def dequantize(self, quantized_set,bits):

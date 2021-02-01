@@ -1,5 +1,5 @@
 import logging
-
+import copy
 from fedml_api.distributed.fedavg.message_define import MyMessage
 from fedml_api.distributed.fedavg.utils import transform_list_to_tensor
 from fedml_core.distributed.client.client_manager import ClientManager
