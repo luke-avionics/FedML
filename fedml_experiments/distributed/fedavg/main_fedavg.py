@@ -32,7 +32,7 @@ from fedml_api.data_preprocessing.cinic10.data_loader import load_partition_data
 from fedml_api.model.cv.cnn import CNN_DropOut
 from fedml_api.model.cv.resnet_gn import resnet18
 from fedml_api.model.cv.mobilenet import mobilenet
-from fedml_api.model.cv.resnet import resnet20, resnet38, resnet74, resnet110, resnet110
+from fedml_api.model.cv.resnet import resnet20, resnet38, resnet74, resnet110, MobileNetV2
 from fedml_api.model.cv.mlp_fedcom import MLP_fedcom
 from fedml_api.model.nlp.rnn import RNN_OriginalFedAvg, RNN_StackOverFlow
 from fedml_api.model.linear.lr import LogisticRegression
@@ -224,6 +224,8 @@ def create_model(args, model_name, output_dim):
         model = mobilenet(class_num=output_dim)
     elif model_name =='mlp_fedcom':
         model = MLP_fedcom()
+    elif model_name == 'mobilenetv2':
+        model = MobileNetV2(num_classes=output_dim)
     return model
 
 

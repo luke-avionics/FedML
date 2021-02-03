@@ -64,7 +64,8 @@ class UniformQuantize(InplaceFunction):
         qmin = -(2. ** (num_bits - 1)) if signed else 0.
         qmax = qmin + 2. ** num_bits - 1.
         scale = qparams.range / (qmax - qmin)
-
+        mask = (scale == 0).float()
+        scale += mask
         # min_scale = torch.tensor(1e-8).expand_as(scale)
         # scale = torch.max(scale, min_scale)
 

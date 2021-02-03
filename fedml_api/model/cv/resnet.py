@@ -238,3 +238,68 @@ def resnet164(class_num):
     # n = 27
     model = ResNet(BasicBlock, [27, 27, 27], class_num)
     return model
+
+
+
+class Block(nn.Module):
+    '''expand + depthwise + pointwise'''
+    def __init__(self, in_planes, out_planes, expansion, stride):
+        super(Block, self).__init__()
+        self.stride = stride
+        planes = expansion * in_planes
+        self.conv1 = conv(in_planes, planes, kernel_size=1, stride=1, padding=0, bias=False)
+        self.bn1 = nn.BatchNorm2d(planes)
+        self.conv2 = conv(planes, planes, kernel_size=3, stride=stride, padding=1, groups=planes, bias=False)
+        self.bn2 = nn.BatchNorm2d(planes)
+        self.conv3 = conv(planes, out_planes, kernel_size=1, stride=1, padding=0, bias=False)
+        self.bn3 = nn.BatchNorm2d(out_planes)
+        self.shortcut = None
+        if stride == 1 and in_planes != out_planes:
+            self.shortcut = conv(in_planes, out_planes, kernel_size=1, stride=1, padding=0, bias=False)
+            self.bn4 = nn.BatchNorm2d(out_planes)
+    def forward(self, x, num_bits):
+        out = F.relu(self.bn1(self.conv1(x, num_bits)))
+        out = F.relu(self.bn2(self.conv2(out, DWS_BITS)))
+        out = self.bn3(self.conv3(out, num_bits))
+        if self.stride == 1:
+            if self.shortcut:
+                out = out + self.bn4(self.shortcut(x, num_bits))
+            else:
+                out = out + x
+        return out
+class MobileNetV2(nn.Module):
+    # (expansion, out_planes, num_blocks, stride)
+    cfg = [(1,  16, 1, 1),
+           (6,  24, 2, 1),  # NOTE: change stride 2 -> 1 for CIFAR10
+           (6,  32, 3, 2),
+           (6,  64, 4, 2),
+           (6,  96, 3, 1),
+           (6, 160, 3, 2),
+           (6, 320, 1, 1)]
+    def __init__(self, num_classes=10):
+        super(MobileNetV2, self).__init__()
+        # NOTE: change conv1 stride 2 -> 1 for CIFAR10
+        self.conv1 = conv(3, 32, kernel_size=3, stride=1, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(32)
+        self._make_layers(in_planes=32)
+        self.conv2 = conv(320, 1280, kernel_size=1, stride=1, padding=0, bias=False)
+        self.bn2 = nn.BatchNorm2d(1280)
+        self.linear = nn.Linear(1280, num_classes)
+        self.num_layers = [item[2] for item in self.cfg]
+    def _make_layers(self, in_planes):
+        for i, (expansion, out_planes, num_blocks, stride) in enumerate(self.cfg):
+            strides = [stride] + [1]*(num_blocks-1)
+            for j, stride in enumerate(strides):
+                setattr(self, 'group{}_layer{}'.format(i+1, j), Block(in_planes, out_planes, expansion, stride))
+                in_planes = out_planes
+    def forward(self, x, num_bits):
+        x = F.relu(self.bn1(self.conv1(x, num_bits)))
+        for g in range(7):
+            for i in range(self.num_layers[g]):
+                x = getattr(self, 'group{}_layer{}'.format(g+1, i))(x, num_bits)
+        x = F.relu(self.bn2(self.conv2(x, num_bits)))
+        # NOTE: change pooling kernel_size 7 -> 4 for CIFAR10
+        x = F.avg_pool2d(x, 4)
+        x = x.view(x.size(0), -1)
+        x = self.linear(x)
+        return x

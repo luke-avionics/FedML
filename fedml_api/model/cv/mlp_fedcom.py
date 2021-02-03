@@ -61,4 +61,3 @@ class MLP_fedcom(torch.nn.Module):
         x = self.linear_3(x, num_bits)
         x = self.relu(x)
         x = self.linear_4(x, num_bits)
-        return x
