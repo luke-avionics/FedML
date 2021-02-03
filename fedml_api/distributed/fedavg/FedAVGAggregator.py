@@ -8,6 +8,7 @@ import numpy as np
 from torch import nn
 
 from fedml_api.distributed.fedavg.utils import transform_list_to_tensor
+from fedml_api.model.cv.quantize import calculate_qparams, quantize
 
 
 class FedAVGAggregator(object):
@@ -20,11 +21,12 @@ class FedAVGAggregator(object):
         self.train_data_local_dict = train_data_local_dict
         self.test_data_local_dict = test_data_local_dict
         self.train_data_local_num_dict = train_data_local_num_dict
-
+        self.best_test_acc=0
         self.worker_num = worker_num
         self.device = device
         self.args = args
         self.model_dict = dict()
+        self.model_dict_latent = dict()
         self.sample_num_dict = dict()
         self.flag_client_model_uploaded_dict = dict()
         for idx in range(self.worker_num):
@@ -44,6 +46,9 @@ class FedAVGAggregator(object):
         self.model_dict[index] = model_params
         self.sample_num_dict[index] = sample_num
         self.flag_client_model_uploaded_dict[index] = True
+
+    def add_local_trained_result_latent(self, index, model_params):
+        self.model_dict_latent[index] = model_params
 
     def check_whether_all_receive(self):
         for idx in range(self.worker_num):
@@ -68,21 +73,23 @@ class FedAVGAggregator(object):
 
         # logging.info("################aggregate: %d" % len(model_list))
         (num0, averaged_params) = model_list[0]
+        averaged_params_latent = copy.deepcopy(averaged_params)
         for k in averaged_params.keys():
             for i in range(0, len(model_list)):
                 local_sample_number, local_model_params = model_list[i]
                 w = local_sample_number / training_num
                 if i == 0:
                     averaged_params[k] = local_model_params[k] * w
+                    averaged_params_latent[k] = copy.deepcopy(self.model_dict_latent[i][k] * w)
                 else:
                     averaged_params[k] += local_model_params[k] * w
-
+                    averaged_params_latent[k] += copy.deepcopy(self.model_dict_latent[i][k] * w)
         # update the global model which is cached at the server side
-        self.model.load_state_dict(averaged_params)
+        self.model.load_state_dict(averaged_params_latent)
 
         end_time = time.time()
         logging.info("aggregate time cost: %d" % (end_time - start_time))
-        return averaged_params
+        return averaged_params, averaged_params_latent
 
     def client_sampling(self, round_idx, client_num_in_total, client_num_per_round):
         if client_num_in_total == client_num_per_round:
@@ -105,15 +112,15 @@ class FedAVGAggregator(object):
             test_tot_corrects = []
             test_losses = []
             #tmp_glb_dict=self.model.state_dict()
-            for idx, client_idx in enumerate(client_indexes):
-                # train data
-                train_tot_correct, train_num_sample, train_loss = self._infer_test(self.train_data_local_dict[client_idx],idx)
-                train_tot_corrects.append(copy.deepcopy(train_tot_correct))
-                train_num_samples.append(copy.deepcopy(train_num_sample))
-                train_losses.append(copy.deepcopy(train_loss))
+            for idx in range(1):
+                # # train data
+                # train_tot_correct, train_num_sample, train_loss = self._infer(self.train_data_local_dict[client_idx])
+                # train_tot_corrects.append(copy.deepcopy(train_tot_correct))
+                # train_num_samples.append(copy.deepcopy(train_num_sample))
+                # train_losses.append(copy.deepcopy(train_loss))
 
                 # test data
-                test_tot_correct, test_num_sample, test_loss = self._infer_test(self.test_data_local_dict[client_idx],idx)
+                test_tot_correct, test_num_sample, test_loss = self._infer(self.test_global)
                 #test_tot_correct, test_num_sample, test_loss = self._infer_test(self.test_data_local_dict[client_idx],idx)
                 test_tot_corrects.append(copy.deepcopy(test_tot_correct))
                 test_num_samples.append(copy.deepcopy(test_num_sample))
@@ -125,14 +132,14 @@ class FedAVGAggregator(object):
                 """
                 if self.args.ci == 1:
                     break
-            #self.model.load_state_dict(tmp_glb_dict)
-            # test on training dataset
-            train_acc = sum(train_tot_corrects) / sum(train_num_samples)
-            train_loss = sum(train_losses) / sum(train_num_samples)
-            wandb.log({"Train/Acc": train_acc, "round": round_idx},commit=False)
-            wandb.log({"Train/Loss": train_loss, "round": round_idx}, commit=False)
-            stats = {'training_acc': train_acc, 'training_loss': train_loss}
-            logging.info(stats)
+            ##self.model.load_state_dict(tmp_glb_dict)
+            ## test on training dataset
+            #train_acc = sum(train_tot_corrects) / sum(train_num_samples)
+            #train_loss = sum(train_losses) / sum(train_num_samples)
+            #wandb.log({"Train/Acc": train_acc, "round": round_idx},commit=False)
+            #wandb.log({"Train/Loss": train_loss, "round": round_idx}, commit=False)
+            #stats = {'training_acc': train_acc, 'training_loss': train_loss}
+            #logging.info(stats)
 
             # test on test dataset
             test_acc = sum(test_tot_corrects) / sum(test_num_samples)
@@ -141,6 +148,9 @@ class FedAVGAggregator(object):
             wandb.log({"Test/Loss": test_loss, "round": round_idx},commit=False)
             wandb.log({"Test/Acc": test_acc, "traffic_volume": traffic_count*2})
             stats = {'test_acc': test_acc, 'test_loss': test_loss}
+            if test_acc > self.best_test_acc:
+                self.best_test_acc = test_acc
+                #torch.save(self.model.state_dict(), "/home/yz87/FedML/fedml_experiments/distributed/fedavg/fedtw1/fedtw"+str(test_acc)+".ckpt")
             logging.info(stats)
 
     def _infer(self, test_data):
@@ -161,7 +171,7 @@ class FedAVGAggregator(object):
                 test_acc += correct.item()
                 test_loss += loss.item() * target.size(0)
                 test_total += target.size(0)
-
+        #torch.save(self.model.state_dict(), '/home/yz87/FedML/fedml_experiments/distributed/fedavg/baseline_non_iid_1.ckpt')
         return test_acc, test_total, test_loss
 
     def _infer_test(self, test_data, index):

@@ -53,13 +53,15 @@ class FedAVGClientManager(ClientManager):
         if self.round_idx == self.num_rounds - 1:
             self.finish()
 
-    def send_model_to_server(self, receive_id, weights, local_sample_num):
+    def send_model_to_server(self, receive_id, weights, local_sample_num, num_bits, latent_weight):
         message = Message(MyMessage.MSG_TYPE_C2S_SEND_MODEL_TO_SERVER, self.get_sender_id(), receive_id)
         message.add_params(MyMessage.MSG_ARG_KEY_MODEL_PARAMS, weights)
         message.add_params(MyMessage.MSG_ARG_KEY_NUM_SAMPLES, local_sample_num)
+        message.add_params(MyMessage.MSG_ARG_KEY_NUM_BITS, num_bits)
+        message.add_params(MyMessage.MSG_ARG_KEY_LATENT_WEIGHT, latent_weight)
         self.send_message(message)
 
     def __train(self):
         logging.info("#######training########### round_id = %d" % self.round_idx)
-        weights, local_sample_num = self.trainer.train()
-        self.send_model_to_server(0, weights, local_sample_num)
+        weights, local_sample_num, num_bits, latent_weight = self.trainer.train()
+        self.send_model_to_server(0, weights, local_sample_num, num_bits,latent_weight)

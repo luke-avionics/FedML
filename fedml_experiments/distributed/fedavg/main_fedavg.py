@@ -26,12 +26,14 @@ from fedml_api.data_preprocessing.stackoverflow_nwp.data_loader import load_part
 from fedml_api.data_preprocessing.MNIST.data_loader import load_partition_data_mnist
 
 from fedml_api.data_preprocessing.cifar10.data_loader import load_partition_data_cifar10
+from fedml_api.data_preprocessing.cifar10.data_loader_fedcom import load_partition_data_cifar10_fedcom
 from fedml_api.data_preprocessing.cifar100.data_loader import load_partition_data_cifar100
 from fedml_api.data_preprocessing.cinic10.data_loader import load_partition_data_cinic10
 from fedml_api.model.cv.cnn import CNN_DropOut
 from fedml_api.model.cv.resnet_gn import resnet18
 from fedml_api.model.cv.mobilenet import mobilenet
 from fedml_api.model.cv.resnet import resnet20, resnet38, resnet74, resnet110, resnet110
+from fedml_api.model.cv.mlp_fedcom import MLP_fedcom
 from fedml_api.model.nlp.rnn import RNN_OriginalFedAvg, RNN_StackOverFlow
 from fedml_api.model.linear.lr import LogisticRegression
 from fedml_api.distributed.fedavg.FedAvgAPI import FedML_init, FedML_FedAvg_distributed
@@ -157,6 +159,12 @@ def load_data(args, dataset_name):
         train_data_local_num_dict, train_data_local_dict, test_data_local_dict, \
         class_num = load_partition_data_federated_stackoverflow_nwp(args.dataset, args.data_dir)
         args.client_num_in_total = client_num
+    elif dataset_name == 'cifar10_fedcom'
+        logging.info("load_data. dataset_name = %s" % dataset_name)
+        client_num, train_data_num, test_data_num, train_data_global, test_data_global, \
+        train_data_local_num_dict, train_data_local_dict, test_data_local_dict, \
+        class_num = load_partition_data_cifar10_fedcom(args.dataset, args.data_dir)
+        args.client_num_in_total = 100
     else:
         if dataset_name == "cifar10":
             data_loader = load_partition_data_cifar10
@@ -214,6 +222,8 @@ def create_model(args, model_name, output_dim):
         model = resnet74(class_num=output_dim)
     elif model_name == "mobilenet":
         model = mobilenet(class_num=output_dim)
+    elif model_name =='mlp_fedcom':
+        model = MLP_fedcom()
     return model
 
 
@@ -261,8 +271,8 @@ if __name__ == "__main__":
     if process_id == 0:
         wandb.init(
             # project="federated_nas",
-            project="cpt_test_12-17",
-            name="FedAVG(d)"+str(args.model)+str(args.dataset)+str(args.batch_size)+str(args.cyclic_num_bits_schedule)+ "-infer"+str(args.inference_bits)+"-"+str(args.partition_method) + "r" + str(args.comm_round) + "-e" + str(
+            project="cpt_test_01-20_1e-4_multi_client",
+            name="CPT_Sync_PFQ_4bit_eval_8bit-FedAVG(d)"+str(args.model)+str(args.dataset)+str(args.batch_size)+str(args.cyclic_num_bits_schedule)+ "-infer"+str(args.inference_bits)+"-"+str(args.partition_method) + "r" + str(args.comm_round) + "-e" + str(
                 args.epochs) + "-lr" + str(
                 args.lr),
             config=args

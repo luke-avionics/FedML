@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
-from .quantize import QConv2d, RangeBN
-from .quantize_rl import  QLinear
+from .quantize import QConv2d, RangeBN, QLinear
 
 
 ACT_FW = 0
@@ -109,7 +108,7 @@ class CNN_OriginalFedAvg(torch.nn.Module):
         x = self.max_pooling(x)
         x = self.flatten(x)
         x = self.relu(self.linear_1(x, num_bits))
-        x = self.softmax(self.linear_2(x, num_bits))
+        self.linear_2(x, num_bits)
         return x
 
 
@@ -182,5 +181,5 @@ class CNN_DropOut(torch.nn.Module):
         x = self.flatten(x)
         x = self.relu(self.linear_1(x, num_bits))
         x = self.dropout_2(x)
-        x = self.softmax(self.linear_2(x, num_bits))
+        self.linear_2(x, num_bits)
         return x

@@ -232,6 +232,8 @@ class QConv2d(nn.Conv2d):
             qbias = quantize(
                 self.bias, num_bits=num_bits,
                 flatten_dims=(0, -1))
+            #self.bias=nn.parameter.Parameter(qbias)
+            #self.bias.data=qbias.data
         else:
             qbias = None
 
@@ -239,6 +241,8 @@ class QConv2d(nn.Conv2d):
         weight_qparams = calculate_qparams(self.weight, num_bits=num_bits, flatten_dims=(1, -1),
                                            reduce_dim=None)
         qweight = quantize(self.weight, qparams=weight_qparams)
+        #self.weight=nn.parameter.Parameter(qweight)
+        #self.weight.data=qweight.data
         output = F.conv2d(qinput, qweight, qbias, self.stride, self.padding, self.dilation, self.groups)
         output = quantize_grad(output, num_bits=8, flatten_dims=(1, -1))
 
@@ -272,10 +276,14 @@ class QLinear(nn.Linear):
         weight_qparams = calculate_qparams(
             self.weight, num_bits=num_bits, flatten_dims=(1, -1), reduce_dim=None)
         qweight = quantize(self.weight, qparams=weight_qparams)
+        #self.weight=nn.parameter.Parameter(qweight)
+        #self.weight.data=qweight.data
         if self.bias is not None:
             qbias = quantize(
                 self.bias, num_bits=num_bits,
                 flatten_dims=(0, -1))
+            #self.bias=nn.parameter.Parameter(qbias)
+            #self.bias.data=qbias.data
         else:
             qbias = None
         output = F.linear(qinput, qweight, qbias)
