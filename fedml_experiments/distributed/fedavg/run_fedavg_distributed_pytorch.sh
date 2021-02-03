@@ -14,8 +14,9 @@ INFERENCE_BITS=0
 schedule=(0 0)
 CYCLIC_NUM_BITS_SCHEDULE=${schedule[@]}
 LR_DECAY_STEP_SIZE=2000
-DATASET='cifar100'
-DATA_DIR="/home/yf22/dataset"
+DATASET='cinic10'
+#DATA_DIR="/home/yf22/dataset"
+DATA_DIR="./../../../data/cinic10"
 
 PROCESS_NUM=`expr $WORKER_NUM + 1`
 echo $PROCESS_NUM
