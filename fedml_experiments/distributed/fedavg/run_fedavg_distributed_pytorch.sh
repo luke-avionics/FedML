@@ -4,19 +4,18 @@ CLIENT_NUM=8
 WORKER_NUM=8
 SERVER_NUM=1
 GPU_NUM_PER_SERVER=4
-MODEL='resnet74'
+MODEL='resnet20'
 DISTRIBUTION='hetero'
 ROUND=160
 EPOCH=1
 BATCH_SIZE=32
-LR='0.05'
-INFERENCE_BITS=0
-schedule=(0 0)
+LR='0.1'
+INFERENCE_BITS=32
+schedule=(4 32)
 CYCLIC_NUM_BITS_SCHEDULE=${schedule[@]}
 LR_DECAY_STEP_SIZE=2000
-DATASET='cinic10'
-#DATA_DIR="/home/yf22/dataset"
-DATA_DIR="./../../../data/cinic10"
+DATASET='cifar10'
+DATA_DIR="/home/yf22/dataset"
 
 PROCESS_NUM=`expr $WORKER_NUM + 1`
 echo $PROCESS_NUM
