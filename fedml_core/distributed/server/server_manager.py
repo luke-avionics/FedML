@@ -55,4 +55,5 @@ class ServerManager(Observer):
     def finish(self):
         logging.info("__finish server")
         if self.backend == "MPI":
+            from mpi4py import MPI
             MPI.COMM_WORLD.Abort()

@@ -198,7 +198,7 @@ class ServerTrainer(object):
         self.latent_dim = 512
         self.alpha = 0.01
 
-        self.model = resnet20(class_num=100).to(self.device)
+        self.model = resnet20(class_num=10).to(self.device)
 
         self.generator = Generator(latent_dim=self.latent_dim, img_size=32).to(self.device)
 
@@ -273,7 +273,7 @@ class ServerTrainer(object):
         gen_imgs_list = []
         labels_list = []
         for batch_id in range(self.batch_num):
-            z = torch.randn(self.batch_size*5, self.latent_dim).cuda()
+            z = torch.randn(self.batch_size, self.latent_dim).cuda()
             gen_imgs = self.generator(z)  #cuda
 
             logits = self.model(gen_imgs)   #cuda
@@ -290,7 +290,7 @@ class ServerTrainer(object):
             final_labels = torch.empty([0]).cuda()
             
             for class_id in torch.unique(labels):
-                index = (labels==class_id).nonzero().squeeze()
+                index = (labels==class_id).nonzero().squeeze(dim=1)
                 final_labels = torch.cat((final_labels, class_id*torch.ones(data_per_class).cuda() ))
                 if len(index) >= data_per_class:
                     temp = gen_imgs[index]   
