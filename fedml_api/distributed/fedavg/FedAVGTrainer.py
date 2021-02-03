@@ -51,6 +51,7 @@ class FedAVGTrainer(object):
         self.lr_steps=lr_steps
     def update_model(self, weights):
         # logging.info("update_model. client_index = %d" % self.client_index)
+        self.weights_t = weights
         self.model.load_state_dict(weights)
 
     def update_dataset(self, client_index):
@@ -123,6 +124,12 @@ class FedAVGTrainer(object):
                     #logging.info('Right before training started !!!!!!!!!!!!!!!!!')
                     log_probs = self.model(x, num_bits=num_bits)
                     loss = self.criterion(log_probs, labels)
+                    l2_norm = 0
+                    weights_local = self.model.named_parameters()
+                    for key in self.weights_t:
+                        if key in weights_local:
+                            l2_norm += torch.norm(weights_local[key] - weights_t[key])
+                    loss += 0.01 * l2_norm
                     loss.backward()
                     if self.args.client_num_in_total == self.args.client_num_per_round:
                         g_norm=nn.utils.clip_grad_norm_(self.model.parameters(),0.9,'inf')
