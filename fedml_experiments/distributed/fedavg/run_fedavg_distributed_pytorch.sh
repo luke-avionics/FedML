@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 CLIENT_NUM=10
-WORKER_NUM=2
+WORKER_NUM=5
 SERVER_NUM=1
 GPU_NUM_PER_SERVER=7
 MODEL='resnet20'

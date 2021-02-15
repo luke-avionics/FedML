@@ -70,6 +70,7 @@ class FedAVGTrainer(object):
             logging.info('Using fake data')
             #logging.info('fake data indicator:' + str(self.indicator_use_share_data))
         else:
+            logging.info('Not using fake data')
             self.total_batch_num = len(self.train_local)
             self.indicator_use_share_data = None
         
@@ -198,11 +199,11 @@ class ServerTrainer(object):
         self.latent_dim = 512
         self.alpha = 0.01
 
-        self.model = resnet20(class_num=10).to(self.device)
+        self.model = resnet20(class_num = 10).to(self.device)
 
         self.generator = Generator(latent_dim=self.latent_dim, img_size=32).to(self.device)
 
-        self.lr = 0.02
+        self.lr = 0.01
         self.lr_steps = 1000
 
         self.criterion = nn.CrossEntropyLoss().to(self.device)
@@ -220,6 +221,7 @@ class ServerTrainer(object):
 
 
     def generate_fake_data(self, global_model_params):
+        '''
         logging.info('Central Server: Generating fake data..............')
 
         
@@ -279,7 +281,9 @@ class ServerTrainer(object):
             logits = self.model(gen_imgs)   #cuda
             labels = logits.argmax(-1)   #cuda
             
-            #print(labels)
+            
+            
+            
             class_num = len(torch.unique(labels))
             data_per_class = round(self.batch_size /class_num)    # number of fake data needed to choose for each class
             
@@ -288,6 +292,7 @@ class ServerTrainer(object):
             #index_list = []
             final_gen_imgs = torch.empty([0, gen_imgs.size()[-3], gen_imgs.size()[-2], gen_imgs.size()[-1]]).cuda()
             final_labels = torch.empty([0]).cuda()
+            
             
             for class_id in torch.unique(labels):
                 index = (labels==class_id).nonzero().squeeze(dim=1)
@@ -304,9 +309,13 @@ class ServerTrainer(object):
                 
             gen_imgs_list.append(final_gen_imgs.to('cpu'))
             labels_list.append(labels.to('cpu'))
+            
+            
+            gen_imgs_list.append(gen_imgs.to('cpu'))
+            labels_list.append(labels.to('cpu'))
 
         shared_data = list(zip(gen_imgs_list, labels_list)) 
-
+        
         # Save first 10 images in the first batch
         for i in range(10):
             save_image(shared_data[0][0][i], './sample_imgs/run2_13client_cifar100/iter{}_image{}_label{}.png'.format(self.invoke_idx, i, shared_data[0][1][i]))
@@ -314,6 +323,53 @@ class ServerTrainer(object):
         # generate fake data
         #shared_data = [[np.ones((8, 3, 32, 32)), np.ones((8))] for _ in range(32)]
         # logging.info("{}".format(shared_data[0]))
-        self.invoke_idx += 1
-
+        self.invoke_idx += 1       
+        '''
+        
+        # Choice 2: import existing images as fake data
+        from PIL import Image
+        import os 
+        from random import sample,randint
+        from torchvision import transforms
+        loader = transforms.Compose([transforms.ToTensor()])  
+        
+        gen_imgs_list = []
+        labels_list = []
+        
+        num_data_per_class = int(self.batch_size/10)
+        compl = self.batch_size % 10
+        
+        for _ in range(self.batch_num):
+        
+            gen_imgs = torch.empty([0, 3, 32, 32])
+            labels = torch.empty([0])
+            
+            for class_id in range(10):
+                file_path = '/home2/mz44/FedML/fedml_api/distributed/fedavg/gen_img/'+ str(class_id) + '/'
+                file_name_list = os.listdir(file_path)
+                selected_files = sample(file_name_list, num_data_per_class)
+                for file_name in selected_files:
+                    select_file = file_path + file_name
+                    im = loader(Image.open(select_file)).unsqueeze(dim=0)
+                    #im = np.transpose(im, (2,0,1))
+                    gen_imgs = torch.cat((gen_imgs, im))
+                    labels = torch.cat((labels, torch.tensor([class_id])))
+        
+            selected_classes = sample(range(10), compl)
+            for class_id in selected_classes:
+                file_path = '/home2/mz44/FedML/fedml_api/distributed/fedavg/gen_img/'+ str(class_id) + '/'
+                file_name_list = os.listdir(file_path)
+                selected_file = file_path + file_name_list[randint(0,len(file_name_list)-1)]
+                im = loader(Image.open(selected_file)).unsqueeze(dim=0)
+                gen_imgs = torch.cat((gen_imgs, im))
+                labels = torch.cat((labels, torch.tensor([class_id])))
+            gen_imgs_list.append(gen_imgs)
+            labels_list.append(labels)
+        
+        
+        
+            
+            
+        shared_data = list(zip(gen_imgs_list, labels_list))     
+            
         return shared_data   # a list with size batch_num: [((batch_size, channel_num, height, weight), label)]
