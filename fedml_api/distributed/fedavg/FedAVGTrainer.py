@@ -195,7 +195,7 @@ class ServerTrainer(object):
 
         self.epochs = 20
         self.iters = 500
-        self.batch_size = 32
+        self.batch_size = 256
         self.latent_dim = 512
         self.alpha = 0.01
 
@@ -326,12 +326,19 @@ class ServerTrainer(object):
         self.invoke_idx += 1       
         '''
         
+        '''
         # Choice 2: import existing images as fake data
         from PIL import Image
         import os 
         from random import sample,randint
         from torchvision import transforms
-        loader = transforms.Compose([transforms.ToTensor()])  
+        import torchvision.transforms as transforms
+        
+        CIFAR_MEAN = [0.49139968, 0.48215827, 0.44653124]
+        CIFAR_STD = [0.24703233, 0.24348505, 0.26158768]
+
+        loader = transforms.Compose([transforms.ToTensor(),
+        transforms.Normalize(CIFAR_MEAN, CIFAR_STD),])  
         
         gen_imgs_list = []
         labels_list = []
@@ -366,10 +373,51 @@ class ServerTrainer(object):
             gen_imgs_list.append(gen_imgs)
             labels_list.append(labels)
         
+        shared_data = list(zip(gen_imgs_list, labels_list))     
+            # End of using existing fake images
+        '''    
+        
+        # Use real images   
+        import argparse 
+        #from PIL import Image
+        #import os 
+        from random import sample,randint
+        from torchvision import transforms
+        import torchvision.transforms as transforms
+        from main_fedavg import add_args, load_data
+        
+        CIFAR_MEAN = [0.49139968, 0.48215827, 0.44653124]
+        CIFAR_STD = [0.24703233, 0.24348505, 0.26158768]
+        
+        parser = argparse.ArgumentParser()
+        args = add_args(parser)
+        dataset = load_data(args, args.dataset)
+        [train_data_num, test_data_num, train_data_global, test_data_global, train_data_local_num_dict, train_data_local_dict, test_data_local_dict, class_num] = dataset
+        train_set = train_data_global.dataset
+        data= train_set.data    #ndarray (50000,32,32,3)
+        label = train_set.target   # ndarray(50000,)
+        loader = transforms.Compose([transforms.ToPILImage(), transforms.Scale(32), transforms.ToTensor(), ])  #transforms.Normalize(CIFAR_MEAN, CIFAR_STD),
+        
+        gen_imgs_list = []
+        labels_list = []
         
         
+        
+        for _ in range(self.batch_num):
+        
+            gen_imgs = torch.empty([0, 3, 32, 32])
+            labels = torch.empty([0])
+            
+            for i in range(self.batch_size):
+                idx = randint(0, data.shape[0]-1)
+                im = loader(data[idx ,:,:,:]).unsqueeze(dim=0)
+                gen_imgs = torch.cat((gen_imgs, im))
+                labels = torch.cat((labels, torch.tensor([label[idx]])))
             
             
+            gen_imgs_list.append(gen_imgs)
+            labels_list.append(labels)
+       
         shared_data = list(zip(gen_imgs_list, labels_list))     
             
         return shared_data   # a list with size batch_num: [((batch_size, channel_num, height, weight), label)]
