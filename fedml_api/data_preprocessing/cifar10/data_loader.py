@@ -125,22 +125,30 @@ def partition_data(dataset, datadir, partition, n_nets, alpha):
     elif partition == "one-class":
         net_dataidx_map = {}
         K = 10
-        num_per_client = round(n_train/n_nets)
+        #num_per_client = round(n_train/n_nets)
         
-        for i in range(n_nets):
-            temp = np.where(y_train == i%K)[0]           
-            net_dataidx_map[i] = np.random.choice(temp, num_per_client)
+        idx = np.argsort(y_train)
+        batch_idxs = np.array_split(idxs, n_nets)
+        net_dataidx_map = {i: batch_idxs[i] for i in range(n_nets)}
+        #for i in range(n_nets):
+         #   temp = np.where(y_train == i%K)[0]           
+         #   net_dataidx_map[i] = np.random.choice(temp, num_per_client)
             
     elif partition == "two-class":  # each client has samples from two classes
         net_dataidx_map = {}
         K = 10
-        num_per_client = round(n_train/n_nets)
+        #num_per_client = round(n_train/n_nets)
         
+        idx = np.argsort(y_train)       
+        
+        batch_idxs = np.array_split(idx, n_nets*2)
         for i in range(n_nets):
-            class_id = np.random.choice(range(K),size = 2, replace= False)
-            temp = np.concatenate((np.where(y_train == class_id[0])[0], np.where(y_train == class_id[1])[0]))
+        #    class_id = np.random.choice(range(K),size = 2, replace= False)
+        #    temp = np.concatenate((np.where(y_train == class_id[0])[0], np.where(y_train == class_id[1])[0]))
             #np.where(y_train == np.random.choice(range(K), size = 2, replace = False))
-            net_dataidx_map[i] = np.random.choice(temp, num_per_client)                          
+            temp = np.random.choice(len(batch_idxs),2)
+            net_dataidx_map[i] = np.concatenate((batch_idxs[temp[0]],batch_idxs[temp[1]]))
+                                  
     
     elif partition == "hetero":
         min_size = 0

@@ -28,7 +28,7 @@ from fedml_api.data_preprocessing.MNIST.data_loader import load_partition_data_m
 from fedml_api.data_preprocessing.cifar10.data_loader import load_partition_data_cifar10
 from fedml_api.data_preprocessing.cifar100.data_loader import load_partition_data_cifar100
 from fedml_api.data_preprocessing.cinic10.data_loader import load_partition_data_cinic10
-from fedml_api.model.cv.cnn import CNN_DropOut
+from fedml_api.model.cv.cnn import CNN_DropOut, CNN_OriginalFedAvg
 from fedml_api.model.cv.resnet_gn import resnet18
 from fedml_api.model.cv.mobilenet import mobilenet
 from fedml_api.model.cv.resnet import resnet20, resnet38, resnet74, resnet110, resnet110
@@ -265,7 +265,7 @@ if __name__ == "__main__":
         wandb.init(
             # project="federated_nas",
             project="repeat_paper",
-            name="two-class-share-real-data"+str(args.model)+str(args.dataset)+str(args.batch_size)+str(args.cyclic_num_bits_schedule)+ "-infer"+str(args.inference_bits)+"-"+str(args.partition_method) + "r" + str(args.comm_round) + "-e" + str(
+            name="one-class-no-share-data"+str(args.model)+str(args.dataset)+str(args.batch_size)+str(args.cyclic_num_bits_schedule)+ "-infer"+str(args.inference_bits)+"-"+str(args.partition_method) + "r" + str(args.comm_round) + "-e" + str(
                 args.epochs) + "-lr" + str(
                 args.lr),
             config=args

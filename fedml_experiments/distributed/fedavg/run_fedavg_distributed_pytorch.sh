@@ -5,10 +5,10 @@ WORKER_NUM=10
 SERVER_NUM=1
 GPU_NUM_PER_SERVER=7
 MODEL='resnet20'
-DISTRIBUTION='two-class'
-ROUND=100
-EPOCH=20
-BATCH_SIZE=128
+DISTRIBUTION='one-class'
+ROUND=500
+EPOCH=5
+BATCH_SIZE=100
 LR='0.1'
 INFERENCE_BITS=0
 LR_DECAY_STEP_SIZE=2000
@@ -35,4 +35,4 @@ mpirun -np $PROCESS_NUM -hostfile ./mpi_host_file python3 ./main_fedavg.py \
   --lr ${LR} \
   --inference_bits ${INFERENCE_BITS} \
   --lr_decay_step_size ${LR_DECAY_STEP_SIZE} \
-  --use_fake_data
+  #--use_fake_data
