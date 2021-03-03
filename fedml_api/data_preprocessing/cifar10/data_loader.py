@@ -128,7 +128,7 @@ def partition_data(dataset, datadir, partition, n_nets, alpha):
         #num_per_client = round(n_train/n_nets)
         
         idx = np.argsort(y_train)
-        batch_idxs = np.array_split(idxs, n_nets)
+        batch_idxs = np.array_split(idx, n_nets)
         net_dataidx_map = {i: batch_idxs[i] for i in range(n_nets)}
         #for i in range(n_nets):
          #   temp = np.where(y_train == i%K)[0]           
