@@ -40,7 +40,7 @@ class FedAVGTrainer(object):
                                               weight_decay=self.args.wd, amsgrad=True)
         #lr_steps = self.args.comm_round * len(self.train_local)
         #self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[lr_steps / 2, lr_steps * 3 / 4], gamma=0.1)
-        self.scheduler = torch.optim.lrscheduler.StepLR(self.optimizer, step_size=self.args.epochs* len(self.train_local), gamma=0.99)
+        self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.args.epochs * len(self.train_local), gamma=0.99)
         self.comm_round = 0 
 
         self.cyclic_period = self.args.comm_round
