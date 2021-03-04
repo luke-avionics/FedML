@@ -48,10 +48,10 @@ def add_args(parser):
     parser.add_argument('--dataset', type=str, default='cifar10', metavar='N',
                         help='dataset used for training')
 
-    parser.add_argument('--data_dir', type=str, default='./../../../data/cifar10',
+    parser.add_argument('--data_dir', type=str, default='/home/yf22/dataset',
                         help='data directory')
 
-    parser.add_argument('--partition_method', type=str, default='hetero', metavar='N',
+    parser.add_argument('--partition_method', type=str, default='one-class', metavar='N',
                         help='how to partition the dataset on local workers')
 
     parser.add_argument('--partition_alpha', type=float, default=0.5, metavar='PA',
