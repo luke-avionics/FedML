@@ -28,7 +28,7 @@ from fedml_api.data_preprocessing.MNIST.data_loader import load_partition_data_m
 from fedml_api.data_preprocessing.cifar10.data_loader import load_partition_data_cifar10
 from fedml_api.data_preprocessing.cifar100.data_loader import load_partition_data_cifar100
 from fedml_api.data_preprocessing.cinic10.data_loader import load_partition_data_cinic10
-from fedml_api.model.cv.cnn import CNN_DropOut, CNN_OriginalFedAvg
+from fedml_api.model.cv.cnn import CNN_DropOut, CNN_OriginalFedAvg, CNNCifar
 from fedml_api.model.cv.resnet_gn import resnet18
 from fedml_api.model.cv.mobilenet import mobilenet
 from fedml_api.model.cv.resnet import resnet20, resnet38, resnet74, resnet110, resnet110
@@ -206,6 +206,8 @@ def create_model(args, model_name, output_dim):
         model = RNN_StackOverFlow()
     elif model_name == "resnet20":
         model = resnet20(class_num=output_dim)
+    elif model_name == "CNN_cifar":
+        model = CNNCifar(class_num=output_dim)
     elif model_name == "resnet38":
         try:
             # logging.info('Test model!!!!!!!!!!!!!!!!!!!!!!!!!!')

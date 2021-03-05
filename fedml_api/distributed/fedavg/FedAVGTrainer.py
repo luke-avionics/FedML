@@ -8,6 +8,7 @@ from torchvision.utils import save_image
 from fedml_api.distributed.fedavg.utils import transform_tensor_to_list, hook_for_BNLoss
 from fedml_api.model.cv.quantize import calculate_qparams, quantize
 from fedml_api.model.cv.resnet import resnet20
+from fedml_api.model.cv.cnn import CNNCifar
 
 from fedml_api.distributed.fedavg.generator import Generator
 
@@ -38,7 +39,7 @@ class FedAVGTrainer(object):
             self.optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.model.parameters()),
                                               lr=self.args.lr,
                                               weight_decay=self.args.wd, amsgrad=True)
-        #lr_steps = self.args.comm_round * len(self.train_local)
+        lr_steps = self.args.comm_round * len(self.train_local)
         #self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[lr_steps / 2, lr_steps * 3 / 4], gamma=0.1)
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.args.epochs * len(self.train_local), gamma=0.99)
         self.comm_round = 0 
