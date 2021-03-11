@@ -41,7 +41,7 @@ class FedAVGTrainer(object):
                                               weight_decay=self.args.wd, amsgrad=True)
         lr_steps = self.args.comm_round * len(self.train_local)
         #self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[lr_steps / 2, lr_steps * 3 / 4], gamma=0.1)
-        self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.args.epochs * len(self.train_local), gamma=0.99)
+        self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.args.epochs * len(self.train_local), gamma=0.992)
         self.comm_round = 0 
 
         self.cyclic_period = self.args.comm_round
@@ -107,7 +107,7 @@ class FedAVGTrainer(object):
                     #     log_probs = self.model(x, num_bits=0)
                     # else:
                     #logging.info('Right before training started !!!!!!!!!!!!!!!!!')
-                    log_probs = self.model(x, num_bits=0)
+                    log_probs = self.model(x)
                     loss = self.criterion(log_probs, labels)
                     loss.backward()
                     g_norm=nn.utils.clip_grad_norm_(self.model.parameters(),0.9,'inf')
@@ -197,7 +197,7 @@ class ServerTrainer(object):
 
         self.epochs = 20
         self.iters = 500
-        self.batch_size = 256
+        self.batch_size = 100
         self.latent_dim = 512
         self.alpha = 0.01
 

@@ -1,58 +1,14 @@
 import torch
 import torch.nn as nn
-from .quantize import QConv2d, RangeBN
-from .quantize_rl import  QLinear
 import torch.nn.functional as F
-
-
-ACT_FW = 0
-ACT_BW = 0
-GRAD_ACT_ERROR = 0
-GRAD_ACT_GC = 0
-
-MOMENTUM = 0.9
-
-DWS_BITS = 8
-DWS_GRAD_BITS = 16
-
-def Conv3x3(in_planes, out_planes, stride=1):
-    "3x3 convolution with padding"
-    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
-                     padding=1, bias=False)
-
-
-def conv3x3(in_planes, out_planes, stride=1):
-    "3x3 convolution with padding"
-    return QConv2d(in_planes, out_planes, kernel_size=3, stride=stride,
-                   padding=1, bias=True, momentum=MOMENTUM, quant_act_forward=ACT_FW, quant_act_backward=ACT_BW,
-                   quant_grad_act_error=GRAD_ACT_ERROR, quant_grad_act_gc=GRAD_ACT_GC)
-
-
-def conv(in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True):
-    return QConv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride,
-                   padding=padding, dilation=dilation, groups=groups, bias=bias, momentum=MOMENTUM, quant_act_forward=ACT_FW, quant_act_backward=ACT_BW,
-                   quant_grad_act_error=GRAD_ACT_ERROR, quant_grad_act_gc=GRAD_ACT_GC)
-def Linear(in_features, out_features, bias=True, dropout=0):
-    """Linear layer (input: N x T x C)"""
-    m = QLinear(in_features, out_features, bias=bias)
-    m.weight.data.uniform_(-0.1, 0.1)
-    if bias:
-        m.bias.data.uniform_(-0.1, 0.1)
-    return m
-
-def make_bn(planes):
-	return nn.BatchNorm2d(planes)
-	# return RangeBN(planes)
 
 class CNN_OriginalFedAvg(torch.nn.Module):
     """The CNN model used in the original FedAvg paper:
     "Communication-Efficient Learning of Deep Networks from Decentralized Data"
     https://arxiv.org/abs/1602.05629.
-
     The number of parameters when `only_digits=True` is (1,663,370), which matches
     what is reported in the paper.
     When `only_digits=True`, the summary of returned model is
-
     Model:
     _________________________________________________________________
     Layer (type)                 Output Shape              Param #
@@ -76,7 +32,6 @@ class CNN_OriginalFedAvg(torch.nn.Module):
     Total params: 1,663,370
     Trainable params: 1,663,370
     Non-trainable params: 0
-
     Args:
       only_digits: If True, uses a final layer with 10 outputs, for use with the
         digits only MNIST dataset (http://yann.lecun.com/exdb/mnist/).
@@ -89,28 +44,27 @@ class CNN_OriginalFedAvg(torch.nn.Module):
     def __init__(self, only_digits=True):
         super(CNN_OriginalFedAvg, self).__init__()
         self.only_digits = only_digits
-        self.conv2d_1 = conv(1, 32, kernel_size=5, padding=2)
-        #self.conv2d_1 = torch.nn.Conv2d(1, 32, kernel_size=5, padding=2)
+        self.conv2d_1 = torch.nn.Conv2d(1, 32, kernel_size=5, padding=2)
         self.max_pooling = nn.MaxPool2d(2, stride=2)
-        self.conv2d_2 = conv(32, 64, kernel_size=5, padding=2)
-        #self.conv2d_2 = torch.nn.Conv2d(32, 64, kernel_size=5, padding=2)
+        self.conv2d_2 = torch.nn.Conv2d(32, 64, kernel_size=5, padding=2)
         self.flatten = nn.Flatten()
-        self.linear_1 = Linear(3136, 512)
-        #self.linear_1 = nn.Linear(3136, 512)
-        self.linear_2 = Linear(512, 10 if only_digits else 62)
-        #self.linear_2 = nn.Linear(512, 10 if only_digits else 62)
+        self.linear_1 = nn.Linear(3136, 512)
+        self.linear_2 = nn.Linear(512, 10 if only_digits else 62)
         self.relu = nn.ReLU()
-        self.softmax = nn.Softmax(dim=1)
+        #self.softmax = nn.Softmax(dim=1)
 
-    def forward(self, x, num_bits=0):
+    def forward(self, x):
         x = torch.unsqueeze(x, 1)
-        x = self.conv2d_1(x, num_bits)
+        x = self.conv2d_1(x)
+        x = self.relu(x)
         x = self.max_pooling(x)
-        x = self.conv2d_2(x, num_bits)
+        x = self.conv2d_2(x)
+        x = self.relu(x)
         x = self.max_pooling(x)
         x = self.flatten(x)
-        x = self.relu(self.linear_1(x, num_bits))
-        x = self.softmax(self.linear_2(x, num_bits))
+        x = self.relu(self.linear_1(x))
+        x = self.linear_2(x)
+        #x = self.softmax(self.linear_2(x))
         return x
 
 
@@ -157,50 +111,78 @@ class CNN_DropOut(torch.nn.Module):
 
     def __init__(self, only_digits=True):
         super(CNN_DropOut, self).__init__()
-        self.conv2d_1 = conv(1, 32, kernel_size=3)
-        #self.conv2d_1 = torch.nn.Conv2d(1, 32, kernel_size=3)
+        self.conv2d_1 = torch.nn.Conv2d(1, 32, kernel_size=3)
         self.max_pooling = nn.MaxPool2d(2, stride=2)
-        self.conv2d_2 = conv(32, 64, kernel_size=3)
-        #self.conv2d_2 = torch.nn.Conv2d(32, 64, kernel_size=3)
+        self.conv2d_2 = torch.nn.Conv2d(32, 64, kernel_size=3)
         self.dropout_1 = nn.Dropout(0.25)
         self.flatten = nn.Flatten()
-        self.linear_1 = Linear(9216, 128)
-        #self.linear_1 = nn.Linear(9216, 128)
+        self.linear_1 = nn.Linear(9216, 128)
         self.dropout_2 = nn.Dropout(0.5)
-        self.linear_2 = Linear(128, 10 if only_digits else 62)
-        #self.linear_2 = nn.Linear(128, 10 if only_digits else 62)
+        self.linear_2 = nn.Linear(128, 10 if only_digits else 62)
         self.relu = nn.ReLU()
-        self.softmax = nn.LogSoftmax(dim=1)
+        #self.softmax = nn.Softmax(dim=1)
 
-    def forward(self, x, num_bits=0):
+    def forward(self, x):
         x = torch.unsqueeze(x, 1)
-        x = self.conv2d_1(x, num_bits)
+        x = self.conv2d_1(x)
         x = self.relu(x)
-        x = self.conv2d_2(x, num_bits)
+        x = self.conv2d_2(x)
         x = self.relu(x)
         x = self.max_pooling(x)
         x = self.dropout_1(x)
         x = self.flatten(x)
-        x = self.relu(self.linear_1(x, num_bits))
+        x = self.linear_1(x)
+        x = self.relu(x)
         x = self.dropout_2(x)
-        x = self.softmax(self.linear_2(x, num_bits))
+        x = self.linear_2(x)
+        #x = self.softmax(self.linear_2(x))
         return x
 
 class CNNCifar(nn.Module):
-    def __init__(self, class_num=10):
+    def __init__(self, only_digits=True):
         super(CNNCifar, self).__init__()
+        
+        self.only_digits = only_digits
+        self.conv2d_1 = torch.nn.Conv2d(3, 32, kernel_size=5, padding=2)
+        self.max_pooling = nn.MaxPool2d(2, stride=2)
+        self.conv2d_2 = torch.nn.Conv2d(32, 64, kernel_size=5, padding=2)
+        self.max_pooling = nn.MaxPool2d(2, stride=2)
+        self.flatten = nn.Flatten()
+        self.linear_1 = nn.Linear(1024, 512)
+        self.linear_2 = nn.Linear(512, 10 if only_digits else 62)
+        self.relu = nn.ReLU()
+        #self.softmax = nn.Softmax(dim=1)
+
+    def forward(self, x):
+        #x = torch.unsqueeze(x, 1)
+        x = self.conv2d_1(x)
+        x = self.relu(x)
+        x = self.max_pooling(x)
+        x = self.conv2d_2(x)
+        x = self.relu(x)
+        x = self.max_pooling(x)
+        x = self.flatten(x)
+        x = self.relu(self.linear_1(x))
+        x = self.linear_2(x)
+        #x = self.softmax(self.linear_2(x))
+        return x
+
+class CNNCifar_prime(nn.Module):
+    def __init__(self, only_digits=True):
+        super(CNNCifar_prime, self).__init__()
+        self.only_digits = only_digits
         self.conv1 = nn.Conv2d(3, 6, 5)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(6, 16, 5)
         self.fc1 = nn.Linear(16 * 5 * 5, 120)
         self.fc2 = nn.Linear(120, 84)
-        self.fc3 = nn.Linear(84, class_num)
+        self.fc3 = nn.Linear(84, 10 if only_digits else 62)
 
-    def forward(self, x, num_bits=0):
+    def forward(self, x):
         x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
         x = x.view(-1, 16 * 5 * 5)
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
-        return F.log_softmax(x, dim=1)
+        return x

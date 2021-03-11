@@ -28,7 +28,7 @@ from fedml_api.data_preprocessing.MNIST.data_loader import load_partition_data_m
 from fedml_api.data_preprocessing.cifar10.data_loader import load_partition_data_cifar10
 from fedml_api.data_preprocessing.cifar100.data_loader import load_partition_data_cifar100
 from fedml_api.data_preprocessing.cinic10.data_loader import load_partition_data_cinic10
-from fedml_api.model.cv.cnn import CNN_DropOut, CNN_OriginalFedAvg, CNNCifar
+from fedml_api.model.cv.cnn import CNN_DropOut, CNN_OriginalFedAvg, CNNCifar, CNNCifar_prime
 from fedml_api.model.cv.resnet_gn import resnet18
 from fedml_api.model.cv.mobilenet import mobilenet
 from fedml_api.model.cv.resnet import resnet20, resnet38, resnet74, resnet110, resnet110
@@ -43,7 +43,7 @@ def add_args(parser):
     return a parser added with args required by fit
     """
     # Training settings
-    parser.add_argument('--model', type=str, default='mobilenet', metavar='N', help='neural network used in training')
+    parser.add_argument('--model', type=str, default='CNN_cifar', metavar='N', help='neural network used in training')
 
     parser.add_argument('--dataset', type=str, default='cifar10', metavar='N',
                         help='dataset used for training')
@@ -207,7 +207,10 @@ def create_model(args, model_name, output_dim):
     elif model_name == "resnet20":
         model = resnet20(class_num=output_dim)
     elif model_name == "CNN_cifar":
-        model = CNNCifar(class_num=output_dim)
+        model = CNNCifar(only_digits=True)
+    elif model_name == "CNN_cifar_prime":
+        model = CNNCifar_prime(only_digits=True)
+    
     elif model_name == "resnet38":
         try:
             # logging.info('Test model!!!!!!!!!!!!!!!!!!!!!!!!!!')
@@ -267,7 +270,7 @@ if __name__ == "__main__":
         wandb.init(
             # project="federated_nas",
             project="FedML non-iid data",
-            name="two-class-no-share-data"+str(args.model)+str(args.dataset)+str(args.batch_size)+str(args.cyclic_num_bits_schedule)+ "-infer"+str(args.inference_bits)+"-"+str(args.partition_method) + "r" + str(args.comm_round) + "-e" + str(
+            name="share"+str(args.model)+str(args.dataset)+str(args.batch_size)+str(args.cyclic_num_bits_schedule)+ "-infer"+str(args.inference_bits)+"-"+str(args.partition_method) + "r" + str(args.comm_round) + "-e" + str(
                 args.epochs) + "-lr" + str(
                 args.lr),
             config=args
@@ -276,10 +279,10 @@ if __name__ == "__main__":
     # Set the random seed. The np.random seed determines the dataset partition.
     # The torch_manual_seed determines the initial weight.
     # We fix these two, so that we can reproduce the result.
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    torch.cuda.manual_seed_all(0)
+   # random.seed(0)
+   # np.random.seed(0)
+   # torch.manual_seed(0)
+   # torch.cuda.manual_seed_all(0)
 
     # GPU arrangement: Please customize this function according your own topology.
     # The GPU server list is configured at "mpi_host_file".

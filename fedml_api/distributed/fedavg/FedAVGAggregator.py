@@ -154,7 +154,7 @@ class FedAVGAggregator(object):
             for batch_idx, (x, target) in enumerate(test_data):
                 x = x.to(self.device)
                 target = target.to(self.device)
-                pred = self.model(x, num_bits=self.args.inference_bits)
+                pred = self.model(x)
                 loss = criterion(pred, target)
                 _, predicted = torch.max(pred, -1)
                 correct = predicted.eq(target).sum()
@@ -175,7 +175,7 @@ class FedAVGAggregator(object):
             for batch_idx, (x, target) in enumerate(test_data):
                 x = x.to(self.device)
                 target = target.to(self.device)
-                pred = self.model(x, num_bits=self.args.inference_bits)
+                pred = self.model(x)
                 loss = criterion(pred, target)
                 _, predicted = torch.max(pred, -1)
                 correct = predicted.eq(target).sum()
