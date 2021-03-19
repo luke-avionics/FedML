@@ -1,81 +1,64 @@
-""" This file contains the model definitions for both original ResNet (6n+2
-layers) and SkipNets.
-"""
+'''
+ResNet for CIFAR-10/100 Dataset.
+Reference:
+1. https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py
+2. https://github.com/facebook/fb.resnet.torch/blob/master/models/resnet.lua
+3. Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun
+Deep Residual Learning for Image Recognition. https://arxiv.org/abs/1512.03385
+'''
+import logging
 
 import torch
 import torch.nn as nn
 import math
 from torch.autograd import Variable
 import torch.autograd as autograd
-from .quantize import quantize, quantize_grad, QConv2d, QLinear, RangeBN
-import torch.nn.functional as F
-
-
-ACT_FW = 0
-ACT_BW = 0
-GRAD_ACT_ERROR = 0
-GRAD_ACT_GC = 0
-
-MOMENTUM = 0.9
-
-DWS_BITS = 8
-DWS_GRAD_BITS = 16
-
-
-def Conv3x3(in_planes, out_planes, stride=1):
+__all__ = ['ResNet', 'cifar100_resnet_110']
+   
+    
+def conv3x3(in_planes, out_planes, stride=1):
     "3x3 convolution with padding"
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
                      padding=1, bias=False)
 
 
-def conv3x3(in_planes, out_planes, stride=1):
-    "3x3 convolution with padding"
-    return QConv2d(in_planes, out_planes, kernel_size=3, stride=stride,
-                   padding=1, bias=False, momentum=MOMENTUM, quant_act_forward=ACT_FW, quant_act_backward=ACT_BW,
-                   quant_grad_act_error=GRAD_ACT_ERROR, quant_grad_act_gc=GRAD_ACT_GC)
+bn_layer_dict = {}
 
 
-def conv(in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=False):
-    return QConv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride,
-                   padding=padding, dilation=dilation, groups=groups, bias=bias, momentum=MOMENTUM, quant_act_forward=ACT_FW, quant_act_backward=ACT_BW,
-                   quant_grad_act_error=GRAD_ACT_ERROR, quant_grad_act_gc=GRAD_ACT_GC)
-
-
-def make_bn(planes):
-	return nn.BatchNorm2d(planes)
-	# return RangeBN(planes)
+def get_bn_layer(planes, identifier):
+    # if identifier not in bn_layer_dict:
+    #     bn_layer_dict[identifier] = nn.BatchNorm2d(planes, affine=True)
+    # return bn_layer_dict[identifier]
+    return nn.BatchNorm2d(planes)
 
 
 class BasicBlock(nn.Module):
     expansion = 1
 
-    def __init__(self, inplanes, planes, stride=1, downsample=None):
+    def __init__(self, inplanes, planes, identifier, stride=1, downsample=None):
         super(BasicBlock, self).__init__()
         self.conv1 = conv3x3(inplanes, planes, stride)
-        self.bn1 = make_bn(planes)
+        self.bn1 = get_bn_layer(planes, identifier + "1")
         self.relu = nn.ReLU(inplace=True)
         self.conv2 = conv3x3(planes, planes)
-        self.bn2 = make_bn(planes)
-        if downsample is not None:
-            self.bn3 = make_bn(planes)
+        self.bn2 = get_bn_layer(planes, identifier + "2")
         self.downsample = downsample
         self.stride = stride
 
-    def forward(self, x, num_bits=0):
+    def forward(self, x):
         residual = x
 
-        out = self.conv1(x, num_bits)
+        out = self.conv1(x)
         out = self.bn1(out)
         out = self.relu(out)
 
-        out = self.conv2(out, num_bits)
+        out = self.conv2(out)
         out = self.bn2(out)
 
         if self.downsample is not None:
-            residual = self.downsample(x, num_bits)
-            residual = self.bn3(residual)
+            residual = self.downsample(x)
 
-        out  += residual
+        out += residual
         out = self.relu(out)
         return out
 
@@ -84,29 +67,20 @@ class BasicBlock(nn.Module):
 # Original ResNet                      #
 ########################################
 
+
 class ResNet(nn.Module):
     """Original ResNet without routing modules"""
-    def __init__(self, block, layers, class_num=100):
+    def __init__(self, block, layers, num_classes=10):
         self.inplanes = 16
         super(ResNet, self).__init__()
         self.conv1 = conv3x3(3, 16)
-        self.bn1 = make_bn(16)
+        self.bn1 = get_bn_layer(16, "1")
         self.relu = nn.ReLU(inplace=True)
-
-        self.num_layers = layers
-
-        self._make_group(block, 16, layers[0], group_id=1,
-                         )
-        self._make_group(block, 32, layers[1], group_id=2,
-                         )
-        self._make_group(block, 64, layers[2], group_id=3,
-                         )
-
-        # self.layer1 = self._make_layer(block, 16, layers[0])
-        # self.layer2 = self._make_layer(block, 32, layers[1], stride=2)
-        # self.layer3 = self._make_layer(block, 64, layers[2], stride=2)
+        self.layer1 = self._make_layer(block, 16, layers[0], "layer1")
+        self.layer2 = self._make_layer(block, 32, layers[1], "layer2", stride=2)
+        self.layer3 = self._make_layer(block, 64, layers[2], "layer3", stride=2)
         self.avgpool = nn.AvgPool2d(8)
-        self.fc = nn.Linear(64 * block.expansion, class_num)
+        self.fc = nn.Linear(64 * block.expansion, num_classes)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -115,96 +89,32 @@ class ResNet(nn.Module):
             elif isinstance(m, nn.BatchNorm2d):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
-            elif isinstance(m, nn.Linear):
-                n = m.weight.size(0) * m.weight.size(1)
-                m.weight.data.normal_(0, math.sqrt(2. / n))
 
-        # for m in self.modules():
-            # if isinstance(m, nn.Conv2d):
-                # n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-                # m.weight.data.normal_(0, math.sqrt(2. / n))
-            # elif isinstance(m, make_bn):
-                # m.weight.data.fill_(1)
-                # m.bias.data.zero_()
-
-    def _make_group(self, block, planes, layers, group_id=1
-                    ):
-        """ Create the whole group"""
-        for i in range(layers):
-            if group_id > 1 and i == 0:
-                stride = 2
-            else:
-                stride = 1
-
-            layer = self._make_layer_v2(block, planes, stride=stride,
-                                       )
-
-            # setattr(self, 'group{}_ds{}'.format(group_id, i), meta[0])
-            setattr(self, 'group{}_layer{}'.format(group_id, i), layer)
-            # setattr(self, 'group{}_gate{}'.format(group_id, i), meta[2])
-
-
-    def _make_layer_v2(self, block, planes, stride=1,
-                       ):
-        """ create one block and optional a gate module """
+    def _make_layer(self, block, planes, blocks, identifier, stride=1):
         downsample = None
         if stride != 1 or self.inplanes != planes * block.expansion:
-
-            downsample = QConv2d(self.inplanes, planes * block.expansion, kernel_size=1, stride=stride, bias=False, momentum=MOMENTUM,
-                    quant_act_forward=ACT_FW, quant_act_backward=ACT_BW, quant_grad_act_error=GRAD_ACT_ERROR, quant_grad_act_gc=GRAD_ACT_GC)
-
-        layer = block(self.inplanes, planes, stride, downsample)
-        self.inplanes = planes * block.expansion
-
-        # if gate_type == 'ffgate1':
-            # gate_layer = FeedforwardGateI(pool_size=pool_size,
-                                          # channel=planes*block.expansion)
-        # elif gate_type == 'ffgate2':
-            # gate_layer = FeedforwardGateII(pool_size=pool_size,
-                                           # channel=planes*block.expansion)
-        # elif gate_type == 'softgate1':
-            # gate_layer = SoftGateI(pool_size=pool_size,
-                                   # channel=planes*block.expansion)
-        # elif gate_type == 'softgate2':
-            # gate_layer = SoftGateII(pool_size=pool_size,
-                                    # channel=planes*block.expansion)
-        # else:
-            # gate_layer = None
-
-        # if downsample:
-            # return downsample, layer, gate_layer
-        # else:
-            # return None, layer, gate_layer
-
-        return layer
-
-    def _make_layer(self, block, planes, blocks, stride=1):
-        downsample = None
-        if stride != 1 or self.inplanes != planes * block.expansion:
-            downsample = QConv2d(self.inplanes, planes * block.expansion, kernel_size=1, stride=stride, bias=False, momentum=MOMENTUM,
-                    quant_act_forward=ACT_FW, quant_act_backward=ACT_BW, quant_grad_act_error=GRAD_ACT_ERROR, quant_grad_act_gc=GRAD_ACT_GC)
+            downsample = nn.Sequential(
+                nn.Conv2d(self.inplanes, planes * block.expansion,
+                          kernel_size=1, stride=stride, bias=False),
+                get_bn_layer(planes * block.expansion, identifier),
+            )
 
         layers = []
-        layers.append(block(self.inplanes, planes, stride, downsample))
+        layers.append(block(self.inplanes, planes, identifier + "0", stride, downsample))
         self.inplanes = planes * block.expansion
         for i in range(1, blocks):
-            layers.append(block(self.inplanes, planes))
+            layers.append(block(self.inplanes, planes, identifier + str(i)))
 
         return nn.Sequential(*layers)
 
-
-    def forward(self, x, num_bits=0):
-        x = self.conv1(x, num_bits)
+    def forward(self, x):
+        x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
 
-        for g in range(3):
-            for i in range(self.num_layers[g]):
-                x = getattr(self, 'group{}_layer{}'.format(g+1, i))(x, num_bits)
-
-        # x = self.layer1(x)
-        # x = self.layer2(x)
-        # x = self.layer3(x)
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
 
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
@@ -212,30 +122,192 @@ class ResNet(nn.Module):
         return x
 
 
-def resnet20(class_num):
+# For CIFAR-10
+
+# ResNet-20
+def resnet20(class_num, pretrained=False, path=None, **kwargs):
+    # n = 3
+    model = ResNet(BasicBlock, [3, 3, 3], num_classes=class_num, **kwargs)
+    if pretrained:
+        checkpoint = torch.load(path)
+        state_dict = checkpoint['state_dict']
+
+        from collections import OrderedDict
+        new_state_dict = OrderedDict()
+        for k, v in state_dict.items():
+            # name = k[7:]  # remove 'module.' of dataparallel
+            name = k.replace("module.", "")
+            new_state_dict[name] = v
+
+        model.load_state_dict(new_state_dict)
+    return model
+    
+# ResNet-38
+def resnet38(class_num,pretrained=False,path=None, **kwargs):
     # n = 6
-    model = ResNet(BasicBlock, [3, 3, 3], class_num)
+    model = ResNet(BasicBlock, [6, 6, 6], num_classes=class_num, **kwargs)
+    if pretrained:
+        checkpoint = torch.load(path)
+        state_dict = checkpoint['state_dict']
+
+        from collections import OrderedDict
+        new_state_dict = OrderedDict()
+        for k, v in state_dict.items():
+            # name = k[7:]  # remove 'module.' of dataparallel
+            name = k.replace("module.", "")
+            new_state_dict[name] = v
+
+        model.load_state_dict(new_state_dict)
     return model
 
-def resnet38(class_num):
-    # n = 6
-    model = ResNet(BasicBlock, [6, 6, 6], class_num)
+# ResNet-56
+def resnet56(class_num,pretrained=False,path=None, **kwargs):
+    # n = 9
+    model = ResNet(BasicBlock, [9, 9, 9], num_classes=class_num, **kwargs)
+    if pretrained:
+        checkpoint = torch.load(path)
+        state_dict = checkpoint['state_dict']
+
+        from collections import OrderedDict
+        new_state_dict = OrderedDict()
+        for k, v in state_dict.items():
+            # name = k[7:]  # remove 'module.' of dataparallel
+            name = k.replace("module.", "")
+            new_state_dict[name] = v
+
+        model.load_state_dict(new_state_dict)
     return model
 
-
-def resnet74(class_num):
+# ResNet-74
+def resnet74(class_num,pretrained=False,path=None, **kwargs):
     # n = 12
-    model = ResNet(BasicBlock, [12, 12, 12], class_num)
+    model = ResNet(BasicBlock, [12, 12, 12], num_classes=class_num, **kwargs)
+    if pretrained:
+        checkpoint = torch.load(path)
+        state_dict = checkpoint['state_dict']
+
+        from collections import OrderedDict
+        new_state_dict = OrderedDict()
+        for k, v in state_dict.items():
+            # name = k[7:]  # remove 'module.' of dataparallel
+            name = k.replace("module.", "")
+            new_state_dict[name] = v
+
+        model.load_state_dict(new_state_dict)
     return model
 
 
-def resnet110(class_num):
+# ResNet-110
+def resnet110(class_num,pretrained=False,path=None, **kwargs):
     # n = 18
-    model = ResNet(BasicBlock, [18, 18, 18], class_num)
+    model = ResNet(BasicBlock, [18, 18, 18], num_classes=class_num, **kwargs)
+    if pretrained:
+        checkpoint = torch.load(path)
+        state_dict = checkpoint['state_dict']
+
+        from collections import OrderedDict
+        new_state_dict = OrderedDict()
+        for k, v in state_dict.items():
+            # name = k[7:]  # remove 'module.' of dataparallel
+            name = k.replace("module.", "")
+            new_state_dict[name] = v
+
+        model.load_state_dict(new_state_dict)
     return model
 
 
-def resnet164(class_num):
-    # n = 27
-    model = ResNet(BasicBlock, [27, 27, 27], class_num)
+# ResNet-152
+def resnet152(class_num,pretrained=False,path=None, **kwargs):
+    # n = 25
+    model = ResNet(BasicBlock, [25, 25, 25], num_classes=class_num, **kwargs)
+    if pretrained:
+        checkpoint = torch.load(path)
+        state_dict = checkpoint['state_dict']
+
+        from collections import OrderedDict
+        new_state_dict = OrderedDict()
+        for k, v in state_dict.items():
+            # name = k[7:]  # remove 'module.' of dataparallel
+            name = k.replace("module.", "")
+            new_state_dict[name] = v
+
+        model.load_state_dict(new_state_dict)
     return model
+
+'''
+# For CIFAR-100
+# ResNet-38
+def resnet38(class_num,pretrained=False,path=None, **kwargs):
+    # n = 6
+    model = ResNet(BasicBlock, [6, 6, 6], num_classes=class_num,**kwargs)
+    if pretrained:
+        checkpoint = torch.load(path)
+        state_dict = checkpoint['state_dict']
+
+        from collections import OrderedDict
+        new_state_dict = OrderedDict()
+        for k, v in state_dict.items():
+            # name = k[7:]  # remove 'module.' of dataparallel
+            name = k.replace("module.", "")
+            new_state_dict[name] = v
+
+        model.load_state_dict(new_state_dict)
+    return model
+
+
+# ResNet-74
+def cifar100_resnet_74(class_num,pretrained=False,path=None, **kwargs):
+    # n = 12
+    model = ResNet(BasicBlock, [12, 12, 12], num_classes=class_num,**kwargs)
+    if pretrained:
+        checkpoint = torch.load(path)
+        state_dict = checkpoint['state_dict']
+
+        from collections import OrderedDict
+        new_state_dict = OrderedDict()
+        for k, v in state_dict.items():
+            # name = k[7:]  # remove 'module.' of dataparallel
+            name = k.replace("module.", "")
+            new_state_dict[name] = v
+
+        model.load_state_dict(new_state_dict)
+    return model
+
+
+# ResNet-110
+def cifar100_resnet_110(class_num,pretrained=False,path=None, **kwargs):
+    # n = 18
+    model = ResNet(BasicBlock, [18, 18, 18], num_classes=class_num,**kwargs)
+    if pretrained:
+        checkpoint = torch.load(path)
+        state_dict = checkpoint['state_dict']
+
+        from collections import OrderedDict
+        new_state_dict = OrderedDict()
+        for k, v in state_dict.items():
+            # name = k[7:]  # remove 'module.' of dataparallel
+            name = k.replace("module.", "")
+            new_state_dict[name] = v
+
+        model.load_state_dict(new_state_dict)
+    return model
+
+
+# ResNet-152
+def cifar100_resnet_152(class_num,pretrained=False,path=None, **kwargs):
+    # n = 25
+    model = ResNet(BasicBlock, [25, 25, 25], num_classes=class_num,**kwargs)
+    if pretrained:
+        checkpoint = torch.load(path)
+        state_dict = checkpoint['state_dict']
+
+        from collections import OrderedDict
+        new_state_dict = OrderedDict()
+        for k, v in state_dict.items():
+            # name = k[7:]  # remove 'module.' of dataparallel
+            name = k.replace("module.", "")
+            new_state_dict[name] = v
+
+        model.load_state_dict(new_state_dict)
+    return model
+'''

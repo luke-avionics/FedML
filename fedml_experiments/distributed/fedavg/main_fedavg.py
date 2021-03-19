@@ -28,10 +28,10 @@ from fedml_api.data_preprocessing.MNIST.data_loader import load_partition_data_m
 from fedml_api.data_preprocessing.cifar10.data_loader import load_partition_data_cifar10
 from fedml_api.data_preprocessing.cifar100.data_loader import load_partition_data_cifar100
 from fedml_api.data_preprocessing.cinic10.data_loader import load_partition_data_cinic10
-from fedml_api.model.cv.cnn import CNN_DropOut, CNN_OriginalFedAvg, CNNCifar, CNNCifar_prime
+from fedml_api.model.cv.cnn import CNN_DropOut, CNN_OriginalFedAvg, CNNCifar, CNNCifar_small, CNNCifar_large
 from fedml_api.model.cv.resnet_gn import resnet18
 from fedml_api.model.cv.mobilenet import mobilenet
-from fedml_api.model.cv.resnet import resnet20, resnet38, resnet74, resnet110, resnet110
+from fedml_api.model.cv.resnet import resnet20, resnet38, resnet74, resnet110
 from fedml_api.model.nlp.rnn import RNN_OriginalFedAvg, RNN_StackOverFlow
 from fedml_api.model.linear.lr import LogisticRegression
 from fedml_api.distributed.fedavg.FedAvgAPI import FedML_init, FedML_FedAvg_distributed
@@ -208,8 +208,10 @@ def create_model(args, model_name, output_dim):
         model = resnet20(class_num=output_dim)
     elif model_name == "CNN_cifar":
         model = CNNCifar(only_digits=True)
-    elif model_name == "CNN_cifar_prime":
-        model = CNNCifar_prime(only_digits=True)
+    elif model_name == "CNN_cifar_large":
+        model = CNNCifar_large(only_digits=True)
+    elif model_name == "CNN_cifar_small":
+        model = CNNCifar_small(only_digits=True)
     
     elif model_name == "resnet38":
         try:
@@ -269,8 +271,8 @@ if __name__ == "__main__":
     if process_id == 0:
         wandb.init(
             # project="federated_nas",
-            project="FedML non-iid data",
-            name="share"+str(args.model)+str(args.dataset)+str(args.batch_size)+str(args.cyclic_num_bits_schedule)+ "-infer"+str(args.inference_bits)+"-"+str(args.partition_method) + "r" + str(args.comm_round) + "-e" + str(
+            project="test model size",
+            name="no-share-"+str(args.model)+str(args.dataset)+str(args.batch_size)+str(args.cyclic_num_bits_schedule)+ "-infer"+str(args.inference_bits)+"-"+str(args.partition_method) + "r" + str(args.comm_round) + "-e" + str(
                 args.epochs) + "-lr" + str(
                 args.lr),
             config=args
