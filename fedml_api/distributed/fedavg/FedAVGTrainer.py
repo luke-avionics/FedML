@@ -4,6 +4,7 @@ import torch
 from torch import nn
 import numpy as np
 from torchvision.utils import save_image
+import random
 
 from fedml_api.distributed.fedavg.utils import transform_tensor_to_list, hook_for_BNLoss
 from fedml_api.model.cv.quantize import calculate_qparams, quantize
@@ -23,7 +24,7 @@ class FedAVGTrainer(object):
         self.local_sample_number = self.train_data_local_num_dict[client_index]
 
         self.indicator_use_share_data = None
-        self.total_batch_num = len(self.train_local)
+        self.total_batch_num = 0# len(self.train_local)
 
         self.device = device
         self.args = args
@@ -65,7 +66,7 @@ class FedAVGTrainer(object):
             # logging.info("+++++++++++shared data: " + str(shared_data))
             self.total_batch_num = len(self.train_local) + len(shared_data)
 
-            share_location = np.random.choice(self.total_batch_num, len(shared_data))
+            share_location = np.random.choice(self.total_batch_num, len(shared_data), replace = False)
 
             self.indicator_use_share_data = np.zeros(self.total_batch_num)
             self.indicator_use_share_data[share_location] = 1
@@ -97,7 +98,8 @@ class FedAVGTrainer(object):
 
                     if self.indicator_use_share_data is not None and self.indicator_use_share_data[batch_idx]:
                         x, labels = self.shared_data[shared_data_idx]
-                        shared_data_idx += 1
+                        shared_data_idx += 1                        
+                       # x, labels = self.train_local[random.randint(0, len(self.train_local))]
                     else:
                         x, labels = next(iter(self.train_local))
 
@@ -193,7 +195,7 @@ class ServerTrainer(object):
     def __init__(self, device):
         self.device = device
 
-        self.batch_num = 50
+        self.batch_num = 80
 
         self.epochs = 20
         self.iters = 500
@@ -379,11 +381,14 @@ class ServerTrainer(object):
             labels_list.append(labels)
         
         shared_data = list(zip(gen_imgs_list, labels_list))     
-            # End of using existing fake images
-          '''  
-        
-        # Use real images   
-        # if the shared data is fixed, uncomment line 
+        # Save first 10 images in the first batch
+        for i in range(10):
+            save_image(shared_data[0][0][i], './existing_fake_imgs/10client_cifar10/iter{}_image{}_label{}.png'.format(self.invoke_idx, i, shared_data[0][1][i]))
+        # this should be same with images in /gen_img
+        self.invoke_idx += 1 
+          
+        '''
+        # Use real images          
         
         import argparse 
         #from PIL import Image
@@ -414,11 +419,11 @@ class ServerTrainer(object):
             labels = torch.empty([0], dtype=torch.long)
            
             for i in range(self.batch_size):
-                #idx = randint(0, data.shape[0]-1)
+                idx = randint(0, data.shape[0]-1)
                 ####################################################################
-                idx = batch_idx * self.batch_size + i + 40000 
+                #idx = batch_idx * self.batch_size + i + 40000 
                 ####################################################################
-                im = loader(data[idx ,:,:,:]).unsqueeze(dim=0)   # (1,3,32,32)
+                im = loader(data[idx ,:,:,:]).unsqueeze(dim=0)   # (1,3,32,32) 
                
                 gen_imgs = torch.cat((gen_imgs, im))
                 labels = torch.cat((labels, torch.tensor([label[idx]], dtype=torch.long)))
@@ -427,7 +432,11 @@ class ServerTrainer(object):
             gen_imgs_list.append(gen_imgs)
             labels_list.append(labels)
           # end of using real data
-       
+        
         shared_data = list(zip(gen_imgs_list, labels_list))     
-            
+        for i in range(10):
+            save_image(shared_data[0][0][i], './shared_real_imgs/10client_cifar10/iter{}_image{}_label{}.png'.format(self.invoke_idx, i, shared_data[0][1][i]))
+            #torch.save(shared_data[0][0][i], './shared_real_imgs/10client_cifar10/iter{}_image{}_label{}.png'.format(self.invoke_idx, i, shared_data[0][1][i]))
+        self.invoke_idx += 1   
+        
         return shared_data   # a list with size batch_num: [((batch_size, channel_num, height, weight), label)]

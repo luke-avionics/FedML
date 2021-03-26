@@ -4,7 +4,7 @@ CLIENT_NUM=10
 WORKER_NUM=10
 SERVER_NUM=1
 GPU_NUM_PER_SERVER=8
-MODEL='CNN_cifar_large'
+MODEL='resnet20'
 DISTRIBUTION='one-class'
 ROUND=500
 EPOCH=1
@@ -35,4 +35,4 @@ mpirun -np $PROCESS_NUM -hostfile ./mpi_host_file python3 ./main_fedavg.py \
   --lr ${LR} \
   --inference_bits ${INFERENCE_BITS} \
   --lr_decay_step_size ${LR_DECAY_STEP_SIZE} \
-  #--use_fake_data
+  --use_fake_data

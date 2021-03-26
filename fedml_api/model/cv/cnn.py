@@ -139,6 +139,32 @@ class CNN_DropOut(torch.nn.Module):
         return x
 
 class CNNCifar(nn.Module):
+    """
+----------------------------------------------------------------
+        Layer (type)               Output Shape         Param #
+================================================================
+            Conv2d-1           [-1, 32, 32, 32]           2,432
+              ReLU-2           [-1, 32, 32, 32]               0
+         MaxPool2d-3           [-1, 32, 16, 16]               0
+            Conv2d-4           [-1, 64, 16, 16]          51,264
+              ReLU-5           [-1, 64, 16, 16]               0
+         MaxPool2d-6             [-1, 64, 8, 8]               0
+           Flatten-7                 [-1, 4096]               0
+            Linear-8                  [-1, 512]       2,097,664
+              ReLU-9                  [-1, 512]               0
+           Linear-10                   [-1, 10]           5,130
+================================================================
+Total params: 2,156,490
+Trainable params: 2,156,490
+Non-trainable params: 0
+----------------------------------------------------------------
+Input size (MB): 0.01
+Forward/backward pass size (MB): 0.88
+Params size (MB): 8.23
+Estimated Total Size (MB): 9.12
+----------------------------------------------------------------   
+    """
+    
     def __init__(self, only_digits=True):
         super(CNNCifar, self).__init__()
                 
@@ -189,6 +215,32 @@ class CNNCifar_small(nn.Module):
         return x
         
 class CNNCifar_large(nn.Module):
+    '''
+----------------------------------------------------------------
+        Layer (type)               Output Shape         Param #
+================================================================
+            Conv2d-1           [-1, 64, 32, 32]           4,864
+              ReLU-2           [-1, 64, 32, 32]               0
+         MaxPool2d-3           [-1, 64, 16, 16]               0
+            Conv2d-4          [-1, 128, 16, 16]         204,928
+              ReLU-5          [-1, 128, 16, 16]               0
+         MaxPool2d-6            [-1, 128, 8, 8]               0
+           Flatten-7                 [-1, 8192]               0
+            Linear-8                  [-1, 512]       4,194,816
+              ReLU-9                  [-1, 512]               0
+           Linear-10                   [-1, 10]           5,130
+================================================================
+Total params: 4,409,738
+Trainable params: 4,409,738
+Non-trainable params: 0
+----------------------------------------------------------------
+Input size (MB): 0.01
+Forward/backward pass size (MB): 1.76
+Params size (MB): 16.82
+Estimated Total Size (MB): 18.59
+----------------------------------------------------------------
+
+    '''
     def __init__(self, only_digits=True):
         super(CNNCifar_large, self).__init__()
         
