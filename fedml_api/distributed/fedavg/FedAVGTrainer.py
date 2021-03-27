@@ -326,14 +326,14 @@ class ServerTrainer(object):
         
         # Save first 10 images in the first batch
         for i in range(10):
-            save_image(shared_data[0][0][i], './sample_imgs/10client_cifar10/iter{}_image{}_label{}.png'.format(self.invoke_idx, i, shared_data[0][1][i]))
+            torch.save(shared_data[0][0][i], './sample_imgs/10client_cifar10/iter{}_image{}_label{}.pt'.format(self.invoke_idx, i, shared_data[0][1][i]))
 
         # generate fake data
         #shared_data = [[np.ones((8, 3, 32, 32)), np.ones((8))] for _ in range(32)]
         # logging.info("{}".format(shared_data[0]))
         self.invoke_idx += 1       
         
-        
+        '''
         
         # Choice 2: import existing images as fake data
         from PIL import Image
@@ -346,10 +346,11 @@ class ServerTrainer(object):
         CIFAR_MEAN = [0.49139968, 0.48215827, 0.44653124]
         CIFAR_STD = [0.24703233, 0.24348505, 0.26158768]
 
-        loader = transforms.Compose([transforms.ToTensor(),
+        loader = transforms.Compose([transforms.RandomCrop(32, padding=4),
+        transforms.RandomHorizontalFlip(), transforms.ToTensor(),
         transforms.Normalize(CIFAR_MEAN, CIFAR_STD),])  
         
-        loader.transforms.append(Cutout(16))
+       # loader.transforms.append(Cutout(16))
         
         gen_imgs_list = []
         labels_list = []
@@ -363,7 +364,7 @@ class ServerTrainer(object):
             labels = torch.empty([0], dtype=torch.long)
             
             for class_id in range(10):
-                file_path = '/home/mz44/FedML/fedml_api/distributed/fedavg/gen_img/'+ str(class_id) + '/'
+                file_path = '/home2/mz44/FedML/fedml_api/distributed/fedavg/gen_img/'+ str(class_id) + '/'
                 file_name_list = os.listdir(file_path)
                 selected_files = sample(file_name_list, num_data_per_class)
                 for file_name in selected_files:
@@ -375,7 +376,7 @@ class ServerTrainer(object):
         
             selected_classes = sample(range(10), compl)
             for class_id in selected_classes:
-                file_path = '/home/mz44/FedML/fedml_api/distributed/fedavg/gen_img/'+ str(class_id) + '/'
+                file_path = '/home2/mz44/FedML/fedml_api/distributed/fedavg/gen_img/'+ str(class_id) + '/'
                 file_name_list = os.listdir(file_path)
                 selected_file = file_path + file_name_list[randint(0,len(file_name_list)-1)]
                 im = loader(Image.open(selected_file)).unsqueeze(dim=0)
@@ -386,8 +387,8 @@ class ServerTrainer(object):
         
         shared_data = list(zip(gen_imgs_list, labels_list))     
         # Save first 10 images in the first batch
-        for i in range(10):
-            save_image(shared_data[0][0][i], './existing_fake_imgs/10client_cifar10/iter{}_image{}_label{}.png'.format(self.invoke_idx, i, shared_data[0][1][i]))
+       # for i in range(10):
+      #      torch.save(shared_data[0][0][i], './existing_fake_imgs/10client_cifar10/iter{}_image{}_label{}.pt'.format(self.invoke_idx, i, shared_data[0][1][i]))
         # this should be same with images in /gen_img
         self.invoke_idx += 1 
           
@@ -412,7 +413,9 @@ class ServerTrainer(object):
         train_set = train_data_global.dataset
         data= train_set.data    #ndarray (50000,32,32,3)
         label = train_set.target   # ndarray(50000,)
-        loader = transforms.Compose([transforms.ToPILImage(), transforms.Scale(32), transforms.ToTensor(), transforms.Normalize(CIFAR_MEAN, CIFAR_STD),])  # 
+        loader = transforms.Compose([transforms.ToPILImage(), transforms.RandomCrop(32, padding=4),
+        transforms.RandomHorizontalFlip(), transforms.ToTensor(), transforms.Normalize(CIFAR_MEAN, CIFAR_STD),])  # 
+       # transforms.Scale(32), 
         
         gen_imgs_list = []
         labels_list = []          
@@ -442,5 +445,5 @@ class ServerTrainer(object):
             #save_image(shared_data[0][0][i], './shared_real_imgs/10client_cifar10/iter{}_image{}_label{}.png'.format(self.invoke_idx, i, shared_data[0][1][i]))
            # torch.save(shared_data[0][0][i], './shared_real_imgs/10client_cifar10/iter{}_image{}_label{}.pt'.format(self.invoke_idx, i, shared_data[0][1][i]))
         self.invoke_idx += 1   
-        
+        '''
         return shared_data   # a list with size batch_num: [((batch_size, channel_num, height, weight), label)]
