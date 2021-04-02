@@ -66,9 +66,9 @@ class FedAVGTrainer(object):
             # logging.info("+++++++++++shared data: " + str(shared_data))
             self.total_batch_num = len(self.train_local) + len(shared_data)
             
-           # torch.save(shared_data[0][0][1], './shared_real_imgs/10client_cifar10/share.pt')
-            #temp, temp_labels = next(iter(self.train_local))
-           # torch.save(temp[0], './shared_real_imgs/10client_cifar10/train.pt')
+            torch.save(shared_data[0][0][1], './shared_fake_imgs/10client_cifar10/share.pt')
+            temp, temp_labels = next(iter(self.train_local))
+            torch.save(temp[0], './shared_fake_imgs/10client_cifar10/train.pt')
             
             share_location = np.random.choice(self.total_batch_num, len(shared_data), replace = False)
 
@@ -333,7 +333,7 @@ class ServerTrainer(object):
         # logging.info("{}".format(shared_data[0]))
         self.invoke_idx += 1       
         
-        '''
+        
         
         # Choice 2: import existing images as fake data
         from PIL import Image
@@ -346,8 +346,7 @@ class ServerTrainer(object):
         CIFAR_MEAN = [0.49139968, 0.48215827, 0.44653124]
         CIFAR_STD = [0.24703233, 0.24348505, 0.26158768]
 
-        loader = transforms.Compose([transforms.RandomCrop(32, padding=4),
-        transforms.RandomHorizontalFlip(), transforms.ToTensor(),
+        loader = transforms.Compose([  transforms.RandomCrop(32, padding=4), transforms.RandomHorizontalFlip(), transforms.ToTensor(),
         transforms.Normalize(CIFAR_MEAN, CIFAR_STD),])  
         
        # loader.transforms.append(Cutout(16))
@@ -364,7 +363,7 @@ class ServerTrainer(object):
             labels = torch.empty([0], dtype=torch.long)
             
             for class_id in range(10):
-                file_path = '/home2/mz44/FedML/fedml_api/distributed/fedavg/gen_img/'+ str(class_id) + '/'
+                file_path = '/home2/mz44/FedML/fedml_api/distributed/fedavg/50/'+ str(class_id) + '/'
                 file_name_list = os.listdir(file_path)
                 selected_files = sample(file_name_list, num_data_per_class)
                 for file_name in selected_files:
@@ -376,7 +375,7 @@ class ServerTrainer(object):
         
             selected_classes = sample(range(10), compl)
             for class_id in selected_classes:
-                file_path = '/home2/mz44/FedML/fedml_api/distributed/fedavg/gen_img/'+ str(class_id) + '/'
+                file_path = '/home2/mz44/FedML/fedml_api/distributed/fedavg/50/'+ str(class_id) + '/'
                 file_name_list = os.listdir(file_path)
                 selected_file = file_path + file_name_list[randint(0,len(file_name_list)-1)]
                 im = loader(Image.open(selected_file)).unsqueeze(dim=0)
@@ -392,7 +391,7 @@ class ServerTrainer(object):
         # this should be same with images in /gen_img
         self.invoke_idx += 1 
           
-        '''
+        
         # Use real images          
         
         import argparse 
@@ -446,4 +445,34 @@ class ServerTrainer(object):
            # torch.save(shared_data[0][0][i], './shared_real_imgs/10client_cifar10/iter{}_image{}_label{}.pt'.format(self.invoke_idx, i, shared_data[0][1][i]))
         self.invoke_idx += 1   
         '''
+        
+        
+        #choice 4: Use pre-trained generator
+        checkpoint = torch.load('/home2/mz44/FedML/fedml_api/distributed/fedavg/warm_up_gan.pt')
+
+        self.generator.load_state_dict(checkpoint) 
+        self.generator = self.generator.to(torch.device('cpu'))
+        
+        gen_imgs_list = []
+        labels_list = []
+        
+        for batch_id in range(self.batch_num):
+            z = torch.randn(self.batch_size, self.latent_dim)#.cuda()
+            gen_imgs = self.generator(z)  #cuda
+            self.model.to(torch.device('cpu'))
+            logits = self.model(gen_imgs)   #cpu
+            labels = logits.argmax(-1)   #cpu
+            
+            gen_imgs_list.append(gen_imgs.to('cpu'))
+            labels_list.append(labels.to('cpu'))
+            self.model.to(torch.device('cuda'))
+        
+        shared_data = list(zip(gen_imgs_list, labels_list)) 
+        
+        # Save first 10 images in the first batch
+        for i in range(10):
+            save_image(shared_data[0][0][i], './sample_imgs/pretrained_generator/iter{}_image{}_label{}.png'.format(self.invoke_idx, i, shared_data[0][1][i]))
+            
+        self.invoke_idx += 1
+        
         return shared_data   # a list with size batch_num: [((batch_size, channel_num, height, weight), label)]
