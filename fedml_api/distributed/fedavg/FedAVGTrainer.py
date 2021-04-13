@@ -11,6 +11,7 @@ from fedml_api.model.cv.quantize import calculate_qparams, quantize
 from fedml_api.model.cv.resnet import resnet20
 from fedml_api.model.cv.cnn import CNNCifar
 
+from fedml_api.distributed.fedavg.teacher_net import ResNet34
 from fedml_api.distributed.fedavg.generator import Generator
 
 class FedAVGTrainer(object):
@@ -448,10 +449,22 @@ class ServerTrainer(object):
         
         
         #choice 4: Use pre-trained generator
-        checkpoint = torch.load('/home2/mz44/FedML/fedml_api/distributed/fedavg/warm_up_gan.pt')
-
+        import torchvision.transforms as transforms
+       # CIFAR_MEAN = [0.49139968, 0.48215827, 0.44653124]
+       # CIFAR_STD = [0.24703233, 0.24348505, 0.26158768]
+        
+        checkpoint = torch.load('/home2/mz44/FedML/fedml_api/distributed/fedavg/gan.pt')
+        teacher = ResNet34()
+        teacher_checkpoint = torch.load('/home2/mz44/FedML/fedml_api/distributed/fedavg/teacher_cifar10.pt')
+        teacher.load_state_dict(teacher_checkpoint)
+        teacher.eval()
+        
+       # loader = transforms.Compose([transforms.ToPILImage(), transforms.RandomCrop(32, padding=4),
+       # transforms.RandomHorizontalFlip(), transforms.ToTensor(), transforms.Normalize(CIFAR_MEAN, CIFAR_STD),]) 
+        
         self.generator.load_state_dict(checkpoint) 
         self.generator = self.generator.to(torch.device('cpu'))
+        self.generator.eval()
         
         gen_imgs_list = []
         labels_list = []
@@ -459,19 +472,31 @@ class ServerTrainer(object):
         for batch_id in range(self.batch_num):
             z = torch.randn(self.batch_size, self.latent_dim)#.cuda()
             gen_imgs = self.generator(z)  #cuda
-            self.model.to(torch.device('cpu'))
-            logits = self.model(gen_imgs)   #cpu
+            
+          #  for i in range(len(gen_imgs)):
+          #      gen_imgs[i]=loader(gen_imgs[i])
+
+            #self.model.to(torch.device('cpu'))
+            logits = teacher(gen_imgs)   #cpu torch.size([100,10])
+            
+            #select data with good confidence
+            p_T = torch.nn.functional.softmax(logits, dim=1)
+            tmp = torch.max(p_T,dim=1)
+            mask = tmp.values.ge(0.9)
+            gen_imgs = gen_imgs[mask]
+            logits = logits[mask]
+            #---------------------------------
             labels = logits.argmax(-1)   #cpu
             
             gen_imgs_list.append(gen_imgs.to('cpu'))
             labels_list.append(labels.to('cpu'))
-            self.model.to(torch.device('cuda'))
+            #self.model.to(torch.device('cuda'))
         
         shared_data = list(zip(gen_imgs_list, labels_list)) 
         
         # Save first 10 images in the first batch
-        for i in range(10):
-            save_image(shared_data[0][0][i], './sample_imgs/pretrained_generator/iter{}_image{}_label{}.png'.format(self.invoke_idx, i, shared_data[0][1][i]))
+        #for i in range(10):
+        #    save_image(shared_data[0][0][i], './sample_imgs/pretrained_generator/iter{}_image{}_label{}.png'.format(self.invoke_idx, i, shared_data[0][1][i]))
             
         self.invoke_idx += 1
         
