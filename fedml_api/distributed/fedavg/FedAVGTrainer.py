@@ -86,10 +86,10 @@ class FedAVGTrainer(object):
                     #logging.info('Beginning of training on one batch !!!!!!!!!!!!!!!!!!!!!!!!!!')
 
                     _iters = self.glb_epoch * len(self.train_local) + batch_idx
-                    #cyclic_period = int((self.args.comm_round * self.args.epochs* len(self.train_local)) // self.cyclic_period)
-                    cyclic_period = int((self.args.comm_round * self.args.epochs *  len(self.train_local)) // 16)
+                    #cyclic_period = int((self.args.comm_round * self.args.epochs * len(self.train_local)) // self.cyclic_period)
+                    cyclic_period = int((self.args.comm_round * self.args.epochs *  len(self.train_local)) // 48)
                     #logging.info("cyclic period: "+ str(cyclic_period))
-                    #cyclic_period = int((self.args.comm_round * self.args.epochs *  len(self.train_local)) // self.cyclic_period)*2
+                    #cyclic_period = int((self.args.comm_round * self.args.epochs * len(self.train_local)) // self.cyclic_period)*2
                     #if self.glb_epoch % 2 == 0:
                     #    self.args.cyclic_num_bits_schedule=[8,32]
                     #else:
@@ -101,8 +101,8 @@ class FedAVGTrainer(object):
                     #    num_bits = 8
                     # elif self.glb_epoch>=self.args.comm_round-10:
                     #     #self.args.inference_bits=32
-                    #     self.args.cyclic_num_bits_schedule=[4,32]
-                    #     cyclic_period = int((self.args.comm_round * len(self.train_local)) // 64)
+                    #     #self.args.cyclic_num_bits_schedule=[4,32]
+                    #     cyclic_period = int((self.args.comm_round * len(self.train_local)) // 32)
                     #     offset=self.offset_finder(self.args.cyclic_num_bits_schedule[1],cyclic_period,len(self.train_local),self.lr_steps)
                     #     offseted_iters=min(max(0,_iters-offset),self.lr_steps)
                     #     num_bits = self.cyclic_adjust_precision(offseted_iters, cyclic_period)

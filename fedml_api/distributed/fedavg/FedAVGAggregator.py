@@ -150,7 +150,7 @@ class FedAVGAggregator(object):
             stats = {'test_acc': test_acc, 'test_loss': test_loss}
             if test_acc > self.best_test_acc:
                 self.best_test_acc = test_acc
-                #torch.save(self.model.state_dict(), "/home/yz87/FedML/fedml_experiments/distributed/fedavg/fedtw1/fedtw"+str(test_acc)+".ckpt")
+                # torch.save(self.model.state_dict(), "/home/yz87/FedML/fedml_experiments/distributed/fedavg/fedtw_"+self.args.model+"/fedtw"+self.args.model+str(test_acc)+".ckpt")
             logging.info(stats)
 
     def _infer(self, test_data):
@@ -171,7 +171,7 @@ class FedAVGAggregator(object):
                 test_acc += correct.item()
                 test_loss += loss.item() * target.size(0)
                 test_total += target.size(0)
-        #torch.save(self.model.state_dict(), '/home/yz87/FedML/fedml_experiments/distributed/fedavg/baseline_non_iid_1.ckpt')
+        # torch.save(self.model.state_dict(), "/home/yz87/FedML/fedml_experiments/distributed/fedavg/baseline_non_iid_"+self.args.model+".ckpt")
         return test_acc, test_total, test_loss
 
     def _infer_test(self, test_data, index):

@@ -25,7 +25,7 @@ from fedml_api.data_preprocessing.stackoverflow_lr.data_loader import load_parti
 from fedml_api.data_preprocessing.stackoverflow_nwp.data_loader import load_partition_data_federated_stackoverflow_nwp
 from fedml_api.data_preprocessing.MNIST.data_loader import load_partition_data_mnist
 
-from fedml_api.data_preprocessing.cifar10.data_loader import load_partition_data_cifar10
+from fedml_api.data_preprocessing.cifar10.data_loader import load_partition_data_cifar10, calculate_emd
 from fedml_api.data_preprocessing.cifar10.data_loader_fedcom import load_partition_data_cifar10_fedcom
 from fedml_api.data_preprocessing.cifar100.data_loader import load_partition_data_cifar100
 from fedml_api.data_preprocessing.cinic10.data_loader import load_partition_data_cinic10
@@ -273,8 +273,8 @@ if __name__ == "__main__":
     if process_id == 0:
         wandb.init(
             # project="federated_nas",
-            project="cpt_test_01-20_1e-4_multi_client",
-            name="CPT_Sync_PFQ_4bit_eval_8bit-FedAVG(d)"+str(args.model)+str(args.dataset)+str(args.batch_size)+str(args.cyclic_num_bits_schedule)+ "-infer"+str(args.inference_bits)+"-"+str(args.partition_method) + "r" + str(args.comm_round) + "-e" + str(
+            project="FedTW_supple_multi_client",
+            name="FedAVG(d)"+str(args.model)+str(args.dataset)+str(args.batch_size)+str(args.cyclic_num_bits_schedule)+ "-infer"+str(args.inference_bits)+"-"+str(args.partition_method) + "r" + str(args.comm_round) + "-e" + str(
                 args.epochs) + "-lr" + str(
                 args.lr),
             config=args
@@ -304,7 +304,11 @@ if __name__ == "__main__":
     dataset = load_data(args, args.dataset)
     [train_data_num, test_data_num, train_data_global, test_data_global,
      train_data_local_num_dict, train_data_local_dict, test_data_local_dict, class_num] = dataset
-
+    emd_sum=calculate_emd(train_data_num,train_data_local_num_dict,train_data_local_dict,args.data_dir)
+    logging.info("====================== EMD value ==========================")
+    logging.info(str(emd_sum))
+    logging.info("====================== partition alpha ==========================")
+    logging.info(str(args.partition_alpha))
     # create model.
     # Note if the model is DNN (e.g., ResNet), the training will be very slow.
     # In this case, please use our FedML distributed version (./fedml_experiments/distributed_fedavg)

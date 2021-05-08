@@ -267,3 +267,34 @@ def load_partition_data_cifar10(dataset, data_dir, partition_method, partition_a
         test_data_local_dict[client_idx] = test_data_local
     return train_data_num, test_data_num, train_data_global, test_data_global, \
            data_local_num_dict, train_data_local_dict, test_data_local_dict, class_num
+
+def calculate_emd(train_data_num,data_local_num_dict,train_data_local_dict,datadir):
+    emd_client_wise={}
+    train_local_class_p={}
+    train_global_class_p={}
+    for i in train_data_local_dict.keys():
+        train_local_class_p[i]={}
+        emd_client_wise[i]=0
+        for k in range(10):
+            train_local_class_p[i][k]=0
+
+    X_train, y_train, X_test, y_test = load_cifar10_data(datadir)
+
+    for k in range(10):
+        train_global_class_p[k] = np.sum(y_train == k)/train_data_num
+
+    for c in train_data_local_dict.keys():
+        weighting = data_local_num_dict[c]/train_data_num
+        for batch_idx, (x, labels) in enumerate(train_data_local_dict[c]):
+            for k in range(10):
+                train_local_class_p[c][k]+=np.sum(labels.numpy() == k)
+        for k in range(10):
+            train_local_class_p[c][k] = train_local_class_p[c][k]/data_local_num_dict[c]
+            emd_client_wise[c] +=  np.abs(train_global_class_p[k] -  train_local_class_p[c][k]) * weighting
+    print(emd_client_wise)
+    emd_sum=0
+    for c in emd_client_wise.keys():
+        emd_sum += emd_client_wise[c]
+    print(emd_sum)
+
+    return emd_sum

@@ -35,7 +35,7 @@ class model_inf():
         self.output_dim=10
         self.inference_bits=inference_bits
         self.ckpt_file=ckpt_file
-        self.model = resnet20(class_num=self.output_dim)
+        self.model = resnet74(class_num=self.output_dim)
         self.train_data_num, self.test_data_num, self.train_data_global, self.test_data_global, \
         self.train_data_local_num_dict, self.train_data_local_dict, self.test_data_local_dict, \
         self.class_num = load_partition_data_cifar10(self.dataset, self.data_dir, self.partition_method,
@@ -65,7 +65,7 @@ class model_inf():
         return test_acc, test_total, test_loss
 
 
-model_inf1=model_inf("",0)
+model_inf1=model_inf("baseline_non_iid_resnet741.ckpt",8)
 test_num_samples = []
 test_tot_corrects = []
 test_losses = []
