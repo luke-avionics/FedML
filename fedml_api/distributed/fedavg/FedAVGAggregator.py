@@ -154,15 +154,16 @@ class FedAVGAggregator(object):
             logging.info(stats)
 
     def _infer(self, test_data):
+        logging.info("testing "+ str(len(test_data)))
         self.model.eval()
-        self.model.to(self.device)
+        self.model.to("cuda:"+str(args.gpu_num_per_server-1))
 
         test_loss = test_acc = test_total = 0.
-        criterion = nn.CrossEntropyLoss().to(self.device)
+        criterion = nn.CrossEntropyLoss().to("cuda:"+str(args.gpu_num_per_server-1))
         with torch.no_grad():
             for batch_idx, (x, target) in enumerate(test_data):
-                x = x.to(self.device)
-                target = target.to(self.device)
+                x = x.to("cuda:"+str(args.gpu_num_per_server-1))
+                target = target.to("cuda:"+str(args.gpu_num_per_server-1))
                 pred = self.model(x, num_bits=self.args.inference_bits)
                 loss = criterion(pred, target)
                 _, predicted = torch.max(pred, -1)

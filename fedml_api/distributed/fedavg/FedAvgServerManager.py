@@ -87,11 +87,11 @@ class FedAVGServerManager(ServerManager):
                     for k in global_model_params.keys():
                         #if 'bias' in k:
                         #    logging.info(str(k))
-                        if 'weight' in k and 'bn' not in k:
+                        if 'weight' in k and 'bn' not in k and 'downsample.1' not in k:
                             weight_qparams = calculate_qparams(copy.deepcopy(global_model_params[k]), num_bits=num_bits+1, flatten_dims=(1, -1),
                                                             reduce_dim=None)
                             global_model_params[k] = quantize(copy.deepcopy(global_model_params[k]), qparams=weight_qparams)
-                        elif 'bias' in k and 'bn' not in k:
+                        elif 'bias' in k and 'bn' not in k and 'downsample.1' not in k:
                             global_model_params[k] = quantize(copy.deepcopy(global_model_params[k]), num_bits=num_bits+1,flatten_dims=(0, -1))
                 self.send_message_sync_model_to_client(receiver_id, global_model_params, self.client_indexes[receiver_id-1])
     def send_message_init_config(self, receive_id, global_model_params, client_index):

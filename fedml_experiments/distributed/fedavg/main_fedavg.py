@@ -29,10 +29,12 @@ from fedml_api.data_preprocessing.cifar10.data_loader import load_partition_data
 from fedml_api.data_preprocessing.cifar10.data_loader_fedcom import load_partition_data_cifar10_fedcom
 from fedml_api.data_preprocessing.cifar100.data_loader import load_partition_data_cifar100
 from fedml_api.data_preprocessing.cinic10.data_loader import load_partition_data_cinic10
+from fedml_api.data_preprocessing.ImageNet_100cls.data_loader import load_partition_data_ImageNet
 from fedml_api.model.cv.cnn import CNN_DropOut
 from fedml_api.model.cv.resnet_gn import resnet18
 from fedml_api.model.cv.mobilenet import mobilenet
 from fedml_api.model.cv.resnet import resnet20, resnet38, resnet74, resnet110, MobileNetV2
+from fedml_api.model.cv.resnet_imagenet import resnet18_imagenet
 from fedml_api.model.cv.mlp_fedcom import MLP_fedcom
 from fedml_api.model.nlp.rnn import RNN_OriginalFedAvg, RNN_StackOverFlow
 from fedml_api.model.linear.lr import LogisticRegression
@@ -165,6 +167,13 @@ def load_data(args, dataset_name):
         train_data_local_num_dict, train_data_local_dict, test_data_local_dict, \
         class_num = load_partition_data_cifar10_fedcom(args.dataset, args.data_dir)
         args.client_num_in_total = 100
+    elif dataset_name == "ILSVRC2012":
+        logging.info("load_data. dataset_name = %s" % dataset_name)
+        train_data_num, test_data_num, train_data_global, test_data_global, \
+        train_data_local_num_dict, train_data_local_dict, test_data_local_dict, \
+        class_num = load_partition_data_ImageNet(dataset=dataset_name, data_dir=args.data_dir,
+                                                 partition_method=None, partition_alpha=None,
+                                                 client_number=args.client_num_in_total, batch_size=args.batch_size)
     else:
         if dataset_name == "cifar10":
             data_loader = load_partition_data_cifar10
@@ -220,6 +229,10 @@ def create_model(args, model_name, output_dim):
             logging.info(str(error))
     elif model_name == "resnet74":
         model = resnet74(class_num=output_dim)
+    elif model_name == "resnet110":
+        model = resnet110(class_num=output_dim)
+    elif model_name == "resnet18_imagenet":
+        model = resnet18_imagenet(num_classes=output_dim)
     elif model_name == "mobilenet":
         model = mobilenet(class_num=output_dim)
     elif model_name =='mlp_fedcom':
@@ -273,7 +286,7 @@ if __name__ == "__main__":
     if process_id == 0:
         wandb.init(
             # project="federated_nas",
-            project="FedTW_supple_multi_client",
+            project="FedTW_rebuttal",
             name="FedAVG(d)"+str(args.model)+str(args.dataset)+str(args.batch_size)+str(args.cyclic_num_bits_schedule)+ "-infer"+str(args.inference_bits)+"-"+str(args.partition_method) + "r" + str(args.comm_round) + "-e" + str(
                 args.epochs) + "-lr" + str(
                 args.lr),
@@ -304,11 +317,12 @@ if __name__ == "__main__":
     dataset = load_data(args, args.dataset)
     [train_data_num, test_data_num, train_data_global, test_data_global,
      train_data_local_num_dict, train_data_local_dict, test_data_local_dict, class_num] = dataset
-    emd_sum=calculate_emd(train_data_num,train_data_local_num_dict,train_data_local_dict,args.data_dir)
-    logging.info("====================== EMD value ==========================")
-    logging.info(str(emd_sum))
-    logging.info("====================== partition alpha ==========================")
-    logging.info(str(args.partition_alpha))
+    if "cifar" in args.dataset:
+        emd_sum=calculate_emd(train_data_num,train_data_local_num_dict,train_data_local_dict,args.data_dir)
+        logging.info("====================== EMD value ==========================")
+        logging.info(str(emd_sum))
+        logging.info("====================== partition alpha ==========================")
+        logging.info(str(args.partition_alpha))
     # create model.
     # Note if the model is DNN (e.g., ResNet), the training will be very slow.
     # In this case, please use our FedML distributed version (./fedml_experiments/distributed_fedavg)
